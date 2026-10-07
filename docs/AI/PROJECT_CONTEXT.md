@@ -1,3 +1,5 @@
+- CRITICAL: Before starting or ending a task execution loop, the agent MUST run `git diff` to ensure no active open editor buffers have silently overwritten disk files with empty strings.
+
 # Project Context — FaithLink Backend
 
 ## Purpose
