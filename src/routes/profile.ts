@@ -6,7 +6,7 @@ import { requireAuth, type AuthContext } from "../middleware/auth.js";
 
 export const profileRouter = new Hono<AuthContext>();
 
-profileRouter.use("*", requireAuth);
+profileRouter.use("/me", requireAuth);
 
 /**
  * GET /api/me

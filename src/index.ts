@@ -2,6 +2,7 @@
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { profileRouter } from "./routes/profile.js";
+import { churchRouter } from "./routes/church.js";
 
 const app = new Hono();
 
@@ -32,6 +33,7 @@ app.get("/", (c) => {
 
 // Mount domain routes
 app.route("/api", profileRouter);
+app.route("/api/churches", churchRouter);
 
 // Global safe error handler
 app.onError((err, c) => {
