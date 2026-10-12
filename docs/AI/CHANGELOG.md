@@ -1,14 +1,19 @@
 # Changelog — FaithLink Backend
 
-## [2026-10-12] Phase 5 — Quizzes & Question Engine
-- Extended `src/db/schema.ts` with `quizzes`, `quiz_questions`, `quiz_options` tables (soft-delete, scoring seams for Phase 6).
-- Applied migration directly to Neon `production` branch via MCP `run_sql_transaction`.
-- Created Zod validation in `src/validation/quiz.ts` (createQuizSchema, updateQuizSchema, quizIdParamSchema).
-- Created service layer `src/services/quiz.ts` with transactional create, full-replace update, soft-delete.
-- Created `src/routes/quiz.ts` with GET list, GET detail, POST create, PUT update, DELETE (soft) — all guarded by `requireAuth` + `requireTenantRole`.
-- Mounted `quizRouter` at `/api/churches` in `src/index.ts`.
-- All 14 integration tests passing (`test/quiz.test.ts`). `tsc --noEmit` clean (exit 0).
-- Deployed to Neon Serverless Cloud; live endpoints verified.
+## [2026-10-12] Phase 5 — Bible Quiz Engine (Authoring + Attempts & Scoring)
+- Part 1 (Authoring): Created `quizzes`, `quiz_questions`, `quiz_options` with Zod validation, transactional service layer, role guards, and endpoints under `/api/churches/:id/quizzes`.
+- Part 2 (Attempts & Scoring):
+  - Created `quiz_attempts` and `quiz_answers` tables in Drizzle schema and pushed migration to Neon PostgreSQL.
+  - Implemented anti-cheating sanitization removing `isCorrect` from member-facing quiz views.
+  - Added attempt lifecycle endpoints:
+    - `POST /api/churches/:id/quizzes/:quizId/attempts` (start attempt)
+    - `GET /api/churches/:id/attempts/:attemptId` (inspect attempt & answers)
+    - `POST /api/churches/:id/attempts/:attemptId/answers` (record/upsert answer idempotently)
+    - `POST /api/churches/:id/attempts/:attemptId/complete` (authoritative scoring & threshold check)
+    - `GET /api/me/quiz-history` (member attempt history)
+    - `GET /api/churches/:id/quizzes/:quizId/attempts` (leader attempt oversight)
+  - Added 11 integration tests in `test/quiz-attempts.test.ts` (all passing).
+  - Deployed to Neon Serverless Cloud (`production` branch).
 
 ## [2026-09-28]
 - Initialized Neon project `crimson-forest-33142254` (branch `production`).

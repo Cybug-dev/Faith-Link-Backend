@@ -1,12 +1,16 @@
-import { eq, and, isNull, inArray } from "drizzle-orm";
+import { eq, and, isNull, inArray, desc } from "drizzle-orm";
 import { db } from "../db/index.js";
 import {
   quizzes,
   quizQuestions,
   quizOptions,
+  quizAttempts,
+  quizAnswers,
   type Quiz,
   type QuizQuestion,
   type QuizOption,
+  type QuizAttempt,
+  type QuizAnswer,
 } from "../db/schema.js";
 import type { CreateQuizInput, UpdateQuizInput } from "../validation/quiz.js";
 
@@ -81,11 +85,17 @@ export async function listQuizzes(churchId: string, isLeader: boolean): Promise<
 /**
  * Fetches a single quiz with all its non-deleted questions and options.
  * Returns null when not found or soft-deleted.
+ * If sanitizeForTaking is true, strips isCorrect from options so members cannot cheat.
  *
  * @param quizId   - UUID of the quiz
  * @param churchId - UUID of the tenant church (tenant isolation guard)
+ * @param sanitizeForTaking - whether to hide isCorrect
  */
-export async function getQuiz(quizId: string, churchId: string): Promise<QuizWithQuestions | null> {
+export async function getQuiz(
+  quizId: string,
+  churchId: string,
+  sanitizeForTaking = false
+): Promise<QuizWithQuestions | null> {
   const [quiz] = await db
     .select()
     .from(quizzes)
@@ -95,6 +105,15 @@ export async function getQuiz(quizId: string, churchId: string): Promise<QuizWit
   if (!quiz) return null;
 
   const questions = await fetchQuestionsWithOptions(quizId);
+
+  if (sanitizeForTaking) {
+    const sanitizedQuestions = questions.map((q) => ({
+      ...q,
+      options: q.options.map(({ isCorrect, ...opt }) => opt as QuizOption),
+    }));
+    return { ...quiz, questions: sanitizedQuestions };
+  }
+
   return { ...quiz, questions };
 }
 
@@ -299,3 +318,363 @@ export async function softDeleteQuiz(quizId: string): Promise<void> {
     .set({ deletedAt: new Date(), updatedAt: new Date() })
     .where(eq(quizzes.id, quizId));
 }
+
+// ---------------------------------------------------------------------------
+// Attempt & Answer Service Functions
+// ---------------------------------------------------------------------------
+
+export type AttemptWithAnswers = QuizAttempt & {
+  quizTitle: string;
+  answers: QuizAnswer[];
+};
+
+/**
+ * Starts a new quiz attempt for a member.
+ * If an active in_progress attempt already exists for this user and quiz, returns it.
+ */
+export async function startQuizAttempt(
+  churchId: string,
+  quizId: string,
+  userId: string,
+  isLeader: boolean
+): Promise<{ attempt: QuizAttempt; questions: (QuizQuestion & { options: QuizOption[] })[] }> {
+  // 1. Verify quiz exists and is available
+  const [quiz] = await db
+    .select()
+    .from(quizzes)
+    .where(
+      and(
+        eq(quizzes.id, quizId),
+        eq(quizzes.churchId, churchId),
+        isNull(quizzes.deletedAt),
+        isLeader ? undefined : eq(quizzes.status, "published")
+      )
+    )
+    .limit(1);
+
+  if (!quiz) {
+    throw new Error("NOT_FOUND: Quiz not found or not available");
+  }
+
+  // 2. Fetch questions
+  const questions = await fetchQuestionsWithOptions(quizId);
+  if (questions.length === 0) {
+    throw new Error("BAD_REQUEST: Quiz has no questions available");
+  }
+
+  // Sanitize options to avoid leaking isCorrect to members
+  const sanitizedQuestions = isLeader
+    ? questions
+    : questions.map((q) => ({
+        ...q,
+        options: q.options.map(({ isCorrect, ...opt }) => opt as QuizOption),
+      }));
+
+  // 3. Check for existing in_progress attempt
+  const [existingAttempt] = await db
+    .select()
+    .from(quizAttempts)
+    .where(
+      and(
+        eq(quizAttempts.churchId, churchId),
+        eq(quizAttempts.quizId, quizId),
+        eq(quizAttempts.userId, userId),
+        eq(quizAttempts.status, "in_progress")
+      )
+    )
+    .limit(1);
+
+  if (existingAttempt) {
+    return { attempt: existingAttempt, questions: sanitizedQuestions };
+  }
+
+  // 4. Calculate total possible points
+  const maxScore = questions.reduce((sum, q) => sum + (q.pointValue || 1), 0);
+
+  // 5. Create new attempt
+  const [newAttempt] = await db
+    .insert(quizAttempts)
+    .values({
+      churchId,
+      quizId,
+      userId,
+      status: "in_progress",
+      maxScore,
+      totalQuestions: questions.length,
+      startedAt: new Date(),
+    })
+    .returning();
+
+  return { attempt: newAttempt, questions: sanitizedQuestions };
+}
+
+/**
+ * Fetches an attempt by ID with tenant and ownership guards.
+ */
+export async function getQuizAttempt(
+  attemptId: string,
+  churchId: string,
+  userId: string,
+  isLeader: boolean
+): Promise<AttemptWithAnswers | null> {
+  const [attempt] = await db
+    .select({
+      attempt: quizAttempts,
+      quizTitle: quizzes.title,
+    })
+    .from(quizAttempts)
+    .innerJoin(quizzes, eq(quizAttempts.quizId, quizzes.id))
+    .where(
+      and(
+        eq(quizAttempts.id, attemptId),
+        eq(quizAttempts.churchId, churchId),
+        isLeader ? undefined : eq(quizAttempts.userId, userId)
+      )
+    )
+    .limit(1);
+
+  if (!attempt) return null;
+
+  const answers = await db
+    .select()
+    .from(quizAnswers)
+    .where(eq(quizAnswers.attemptId, attemptId));
+
+  // If in_progress and not leader, sanitize isCorrect & pointsAwarded on answers
+  const sanitizedAnswers =
+    !isLeader && attempt.attempt.status === "in_progress"
+      ? answers.map(({ isCorrect, pointsAwarded, ...ans }) => ans as QuizAnswer)
+      : answers;
+
+  return {
+    ...attempt.attempt,
+    quizTitle: attempt.quizTitle,
+    answers: sanitizedAnswers,
+  };
+}
+
+/**
+ * Submits an answer for a question in an active attempt.
+ * Evaluates correctness server-side and stores points.
+ */
+export async function submitQuizAnswer(
+  attemptId: string,
+  churchId: string,
+  userId: string,
+  questionId: string,
+  selectedOptionId: string
+): Promise<{ message: string; answer: Partial<QuizAnswer> }> {
+  // 1. Fetch and validate attempt
+  const [attempt] = await db
+    .select()
+    .from(quizAttempts)
+    .where(
+      and(
+        eq(quizAttempts.id, attemptId),
+        eq(quizAttempts.churchId, churchId),
+        eq(quizAttempts.userId, userId)
+      )
+    )
+    .limit(1);
+
+  if (!attempt) {
+    throw new Error("NOT_FOUND: Attempt not found");
+  }
+
+  if (attempt.status !== "in_progress") {
+    throw new Error(`CONFLICT: Attempt is already ${attempt.status}`);
+  }
+
+  // 2. Validate question belongs to this quiz
+  const [question] = await db
+    .select()
+    .from(quizQuestions)
+    .where(
+      and(
+        eq(quizQuestions.id, questionId),
+        eq(quizQuestions.quizId, attempt.quizId),
+        isNull(quizQuestions.deletedAt)
+      )
+    )
+    .limit(1);
+
+  if (!question) {
+    throw new Error("BAD_REQUEST: Invalid question ID for this quiz");
+  }
+
+  // 3. Validate option belongs to this question and check correctness
+  const [option] = await db
+    .select()
+    .from(quizOptions)
+    .where(
+      and(
+        eq(quizOptions.id, selectedOptionId),
+        eq(quizOptions.questionId, questionId)
+      )
+    )
+    .limit(1);
+
+  if (!option) {
+    throw new Error("BAD_REQUEST: Invalid option ID for this question");
+  }
+
+  const isCorrect = option.isCorrect;
+  const pointsAwarded = isCorrect ? question.pointValue : 0;
+
+  // 4. Upsert answer idempotently
+  const [saved] = await db
+    .insert(quizAnswers)
+    .values({
+      attemptId,
+      questionId,
+      selectedOptionId,
+      isCorrect,
+      pointsAwarded,
+      submittedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: [quizAnswers.attemptId, quizAnswers.questionId],
+      set: {
+        selectedOptionId,
+        isCorrect,
+        pointsAwarded,
+        submittedAt: new Date(),
+      },
+    })
+    .returning();
+
+  return {
+    message: "Answer recorded successfully",
+    answer: {
+      id: saved.id,
+      attemptId: saved.attemptId,
+      questionId: saved.questionId,
+      selectedOptionId: saved.selectedOptionId,
+      submittedAt: saved.submittedAt,
+    },
+  };
+}
+
+/**
+ * Completes an attempt, authoritatively computing score and pass/fail status.
+ * Idempotent: completing an already completed attempt returns existing result.
+ */
+export async function completeQuizAttempt(
+  attemptId: string,
+  churchId: string,
+  userId: string
+): Promise<QuizAttempt> {
+  return db.transaction(async (tx) => {
+    // 1. Fetch attempt with quiz info
+    const [row] = await tx
+      .select({
+        attempt: quizAttempts,
+        passingScore: quizzes.passingScore,
+      })
+      .from(quizAttempts)
+      .innerJoin(quizzes, eq(quizAttempts.quizId, quizzes.id))
+      .where(
+        and(
+          eq(quizAttempts.id, attemptId),
+          eq(quizAttempts.churchId, churchId),
+          eq(quizAttempts.userId, userId)
+        )
+      )
+      .limit(1);
+
+    if (!row) {
+      throw new Error("NOT_FOUND: Attempt not found");
+    }
+
+    const { attempt, passingScore } = row;
+
+    // Idempotent: return existing completed attempt
+    if (attempt.status === "completed") {
+      return attempt;
+    }
+
+    if (attempt.status !== "in_progress") {
+      throw new Error(`CONFLICT: Attempt is already ${attempt.status}`);
+    }
+
+    // 2. Fetch all questions for max score calculation
+    const questions = await tx
+      .select()
+      .from(quizQuestions)
+      .where(and(eq(quizQuestions.quizId, attempt.quizId), isNull(quizQuestions.deletedAt)));
+
+    const maxScore = questions.reduce((sum, q) => sum + (q.pointValue || 1), 0);
+
+    // 3. Fetch all submitted answers
+    const answers = await tx
+      .select()
+      .from(quizAnswers)
+      .where(eq(quizAnswers.attemptId, attemptId));
+
+    const score = answers.reduce((sum, a) => sum + (a.pointsAwarded || 0), 0);
+    const correctCount = answers.filter((a) => a.isCorrect).length;
+    const percentage = maxScore > 0 ? Math.round((score / maxScore) * 100) : 0;
+    const isPassed = passingScore !== null && passingScore !== undefined ? percentage >= passingScore : true;
+
+    const [completed] = await tx
+      .update(quizAttempts)
+      .set({
+        status: "completed",
+        score,
+        maxScore,
+        percentage,
+        correctCount,
+        totalQuestions: questions.length,
+        isPassed,
+        completedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(quizAttempts.id, attemptId))
+      .returning();
+
+    return completed;
+  });
+}
+
+/**
+ * Returns a user's quiz attempt history.
+ */
+export async function getUserQuizHistory(
+  userId: string,
+  churchId?: string
+): Promise<(QuizAttempt & { quizTitle: string })[]> {
+  const rows = await db
+    .select({
+      attempt: quizAttempts,
+      quizTitle: quizzes.title,
+    })
+    .from(quizAttempts)
+    .innerJoin(quizzes, eq(quizAttempts.quizId, quizzes.id))
+    .where(
+      and(
+        eq(quizAttempts.userId, userId),
+        churchId ? eq(quizAttempts.churchId, churchId) : undefined
+      )
+    )
+    .orderBy(desc(quizAttempts.startedAt));
+
+  return rows.map((r) => ({
+    ...r.attempt,
+    quizTitle: r.quizTitle,
+  }));
+}
+
+/**
+ * Returns all attempts for a quiz (leader view).
+ */
+export async function getQuizAttemptsForLeader(
+  quizId: string,
+  churchId: string
+): Promise<QuizAttempt[]> {
+  return db
+    .select()
+    .from(quizAttempts)
+    .where(and(eq(quizAttempts.quizId, quizId), eq(quizAttempts.churchId, churchId)))
+    .orderBy(desc(quizAttempts.startedAt));
+}
+

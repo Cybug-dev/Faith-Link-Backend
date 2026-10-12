@@ -136,9 +136,30 @@ export const quizIdParamSchema = z.object({
   quizId: z.string({ message: "Quiz ID must be a string" }).uuid("Invalid quiz ID format (must be a valid UUID)"),
 });
 
+/**
+ * Path param validation for routes that accept :id (church) and :attemptId.
+ */
+export const attemptIdParamSchema = z.object({
+  id: z.string({ message: "Church ID must be a string" }).uuid("Invalid church ID format (must be a valid UUID)"),
+  attemptId: z.string({ message: "Attempt ID must be a string" }).uuid("Invalid attempt ID format (must be a valid UUID)"),
+});
+
+/**
+ * Payload for submitting an answer to a question in an active attempt.
+ */
+export const submitAnswerSchema = z.object({
+  questionId: z
+    .string({ message: "Question ID must be a string" })
+    .uuid("Invalid question ID format (must be a valid UUID)"),
+  selectedOptionId: z
+    .string({ message: "Selected option ID must be a string" })
+    .uuid("Invalid option ID format (must be a valid UUID)"),
+});
+
 export type CreateQuizInput = z.infer<typeof createQuizSchema>;
 export type UpdateQuizInput = z.infer<typeof updateQuizSchema>;
 export type CreateQuestionInput = z.infer<typeof createQuestionSchema>;
 export type UpdateQuestionInput = z.infer<typeof updateQuestionSchema>;
 export type CreateOptionInput = z.infer<typeof createOptionSchema>;
 export type UpdateOptionInput = z.infer<typeof updateOptionSchema>;
+export type SubmitAnswerInput = z.infer<typeof submitAnswerSchema>;

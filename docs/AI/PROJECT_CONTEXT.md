@@ -26,16 +26,16 @@ FaithLink is a production-grade, multi-tenant digital engagement platform for ch
 |---|---|---|
 | 0–3 | Auth, Profiles, Churches, Tenant RBAC | ✅ Live |
 | 4 | Learning Content (lessons, completions, progress) | ✅ Live |
-| 5 | Quizzes & Question Engine (quizzes, questions, options) | ✅ Live |
+| 5 | Bible Quiz Engine (quizzes, questions, attempts, answers) | ✅ Live |
 
 ## Active DB Tables (public schema)
-`profiles`, `churches`, `church_members`, `lessons`, `lesson_completions`, `quizzes`, `quiz_questions`, `quiz_options`
+`profiles`, `churches`, `church_members`, `lessons`, `lesson_completions`, `quizzes`, `quiz_questions`, `quiz_options`, `quiz_attempts`, `quiz_answers`
 
 ## Key Conventions
 - Routes mounted at `/api/churches` for church-scoped resources
 - All auth via `requireAuth` → `requireTenantRole(roles[])` middleware chain
 - Service layer (`src/services/`) for multi-table transactions (introduced Phase 5)
-- Soft-delete via `deletedAt` on `quizzes` and `quiz_questions` (Phase 6 audit seam)
+- Soft-delete via `deletedAt` on `quizzes` and `quiz_questions`
 - Test runner: `npx tsx test/<name>.test.ts`
 - Deploy: `neon deploy` (targets `production` branch automatically)
 

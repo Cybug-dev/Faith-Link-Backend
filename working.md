@@ -80,11 +80,18 @@ Implement FaithLink Phase 4: Learning Content (Lessons & Progress Engine) with t
 - None.
 
 ## Handoff
-- **Last completed:** Phase 5: Quizzes & Question Engine (all 7 steps completed, 14 tests passing, deployed)
-- **Currently doing:** Idle — Phase 5 complete
-- **Next action:** Implement Phase 6 (Submissions & Scoring) when requested
+- **Last completed:** Phase 5: Bible Quiz Engine (Authoring + Attempts & Authoritative Scoring complete, 25 tests passing, deployed)
+- **Currently doing:** Ready for Phase 6: Results, Progress & Achievements (per FAITHLINK_MVP_ARCHITECTURE_PLAN.md §12)
+- **Next action:** Start Phase 6: Results, Progress & Achievements when instructed
 
 ## Phase 5 Task Log
+### [2026-10-12 18:00–18:10] Phase 5 Part 2 — Quiz Attempts & Authoritative Scoring
+- **Files:** `src/db/schema.ts`, `src/validation/quiz.ts`, `src/services/quiz.ts`, `src/routes/quiz.ts`, `src/routes/profile.ts`, `test/quiz-attempts.test.ts`
+- **Goal:** Attempts lifecycle, idempotent answer submissions, anti-cheating sanitization, server-authoritative scoring & history
+- **Change:** Added `quiz_attempts` & `quiz_answers`, migration applied to Neon, attempt endpoints, 11 tests (all pass), deployed to Neon Cloud
+- **Status:** ✅ Success
+- **Verification:** `tsc --noEmit` exit 0, all 11 attempt tests and 14 quiz tests pass, deployed via `neon deploy`
+
 ### [2026-10-12 13:06–14:27] Phase 5 — Quizzes & Question Engine
 - **Files:** `src/db/schema.ts`, `src/validation/quiz.ts`, `src/services/quiz.ts`, `src/routes/quiz.ts`, `src/index.ts`, `test/quiz.test.ts`, `docs/AI/*`
 - **Goal:** Quiz authoring + delivery with scoring seams for Phase 6

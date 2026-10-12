@@ -233,4 +233,74 @@ export type NewQuizQuestion = typeof quizQuestions.$inferInsert;
 export type QuizOption = typeof quizOptions.$inferSelect;
 export type NewQuizOption = typeof quizOptions.$inferInsert;
 
+/**
+ * Quiz Attempts in public schema.
+ * Represents a member's attempt at taking a church quiz.
+ * Implements attempt lifecycle: 'in_progress' | 'completed' | 'expired' | 'abandoned' | 'invalidated'.
+ */
+export const quizAttempts = pgTable(
+  "quiz_attempts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    churchId: uuid("church_id")
+      .notNull()
+      .references(() => churches.id, { onDelete: "cascade" }),
+    quizId: uuid("quiz_id")
+      .notNull()
+      .references(() => quizzes.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => profiles.userId, { onDelete: "cascade" }),
+    status: varchar("status", { length: 50 }).notNull().default("in_progress"),
+    score: integer("score"),
+    maxScore: integer("max_score"),
+    percentage: integer("percentage"),
+    correctCount: integer("correct_count"),
+    totalQuestions: integer("total_questions"),
+    isPassed: boolean("is_passed"),
+    startedAt: timestamp("started_at", { withTimezone: true }).defaultNow().notNull(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("quiz_attempts_church_idx").on(table.churchId),
+    index("quiz_attempts_quiz_idx").on(table.quizId),
+    index("quiz_attempts_user_idx").on(table.userId),
+    index("quiz_attempts_status_idx").on(table.status),
+  ]
+);
+
+/**
+ * Quiz Answers in public schema.
+ * Records submitted answers per attempt and question.
+ * Server evaluates correctness on submission or final completion.
+ */
+export const quizAnswers = pgTable(
+  "quiz_answers",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    attemptId: uuid("attempt_id")
+      .notNull()
+      .references(() => quizAttempts.id, { onDelete: "cascade" }),
+    questionId: uuid("question_id")
+      .notNull()
+      .references(() => quizQuestions.id, { onDelete: "cascade" }),
+    selectedOptionId: uuid("selected_option_id")
+      .references(() => quizOptions.id, { onDelete: "set null" }),
+    isCorrect: boolean("is_correct").notNull().default(false),
+    pointsAwarded: integer("points_awarded").notNull().default(0),
+    submittedAt: timestamp("submitted_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("quiz_answers_attempt_question_idx").on(table.attemptId, table.questionId),
+    index("quiz_answers_attempt_idx").on(table.attemptId),
+  ]
+);
+
+export type QuizAttempt = typeof quizAttempts.$inferSelect;
+export type NewQuizAttempt = typeof quizAttempts.$inferInsert;
+export type QuizAnswer = typeof quizAnswers.$inferSelect;
+export type NewQuizAnswer = typeof quizAnswers.$inferInsert;
+
 

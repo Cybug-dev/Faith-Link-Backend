@@ -3,6 +3,7 @@ import { eq, desc } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { profiles, churchMembers, churches, lessonCompletions, lessons } from "../db/schema.js";
 import { requireAuth, type AuthContext } from "../middleware/auth.js";
+import { getUserQuizHistory } from "../services/quiz.js";
 
 export const profileRouter = new Hono<AuthContext>();
 
@@ -135,4 +136,26 @@ profileRouter.get("/me/progress", async (c) => {
     completions,
   });
 });
+
+/**
+ * GET /api/me/quiz-history
+ * Retrieves all quiz attempts and results for the authenticated user.
+ */
+profileRouter.get("/me/quiz-history", async (c) => {
+  const userId = c.get("userId");
+  const churchId = c.req.query("churchId");
+
+  try {
+    const history = await getUserQuizHistory(userId, churchId);
+    return c.json({
+      userId,
+      totalAttempts: history.length,
+      attempts: history,
+    });
+  } catch (err) {
+    console.error("Error retrieving user quiz history:", err);
+    return c.json({ error: "Internal Server Error: Failed to retrieve quiz history" }, 500);
+  }
+});
+
 

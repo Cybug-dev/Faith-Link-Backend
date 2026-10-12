@@ -3,20 +3,26 @@
 ## Completed Work
 - [x] Phases 1–3: Auth, tenancy, profiles, church CRUD, membership, JWT middleware.
 - [x] Phase 4: Learning Content — `lessons`, `lesson_completions`, CRUD routes, completion tracking, `GET /api/me/progress`, 10 tests, deployed.
-- [x] Phase 5: Quizzes & Question Engine
-  - Schema: `quizzes` (soft-delete, `passingScore` seam), `quiz_questions` (`pointValue` seam, soft-delete), `quiz_options` (`isCorrect` flag).
-  - Service layer: `src/services/quiz.ts` (transactional create, full-replace update, soft-delete).
-  - Endpoints: `GET /api/churches/:id/quizzes`, `GET …/:quizId`, `POST`, `PUT`, `DELETE` (soft).
-  - Authoring guard: `admin / pastor / leader` only.
-  - 14 tests passing. `tsc --noEmit` clean. Deployed to Neon Cloud.
+- [x] Phase 5: Bible Quiz Engine
+  - Authoring: `quizzes`, `quiz_questions`, `quiz_options` (soft-delete, `passingScore`, `pointValue`, `isCorrect`).
+  - Attempts & Answers: `quiz_attempts`, `quiz_answers` (tenant-scoped, foreign keys, timestamps, attempt states).
+  - Anti-cheating: sensitive `isCorrect` hidden on member preview.
+  - Endpoints: `POST /api/churches/:id/quizzes/:quizId/attempts`, `GET /api/churches/:id/attempts/:attemptId`, `POST /api/churches/:id/attempts/:attemptId/answers`, `POST /api/churches/:id/attempts/:attemptId/complete`, `GET /api/me/quiz-history`, `GET /api/churches/:id/quizzes/:quizId/attempts`.
+  - Service layer with transactional scoring, 25 tests passing (14 quiz + 11 attempts), deployed to Neon Cloud.
 
 ## Active & Upcoming Work (FaithLink MVP Roadmap)
-- [ ] Phase 6: Submissions & Scoring
-  - Schema: `quiz_attempts`, `quiz_answers` (linked to `quizzes` and `quiz_questions`).
-  - Endpoint: `POST /api/churches/:id/quizzes/:quizId/submit` — validate answers, compute score vs `passingScore`, record attempt.
-  - Endpoint: `GET /api/churches/:id/quizzes/:quizId/attempts` — leader view of all attempts.
-  - Endpoint: `GET /api/me/quiz-attempts` — member view of own attempts and scores.
-- [ ] Phase 7: Progress & Gamification (Leaderboards & Points).
+- [ ] Phase 6: Results, Progress & Achievements (per FAITHLINK_MVP_ARCHITECTURE_PLAN.md §12)
+  - Results: Enriched score, correct/incorrect summary, completion status, basic performance feedback, optional explanations.
+  - Progress: Aggregated learning activity (lessons completed, quizzes completed, best quiz scores, recent activity).
+  - Achievements: Server-trusted awards (`First Lesson Completed`, `First Quiz Completed`, `Perfect Score`, `Completed 5 Lessons`, `Completed 10 Quizzes`).
+  - Endpoints:
+    - `GET /api/me/progress` (unified learning & quiz progress)
+    - `GET /api/me/achievements` (user achievements list & unlocked state)
+    - `GET /api/me/stats` (summary stats)
+- [ ] Phase 7: Leaderboard / Scoreboard (`GET /api/churches/:id/leaderboard`, per FAITHLINK_MVP_ARCHITECTURE_PLAN.md §13)
+- [ ] Phase 8: Activities & Events (per FAITHLINK_MVP_ARCHITECTURE_PLAN.md §14)
+- [ ] Phase 9: MVP Integration & Hardening (per FAITHLINK_MVP_ARCHITECTURE_PLAN.md §15)
+
 
 
 
