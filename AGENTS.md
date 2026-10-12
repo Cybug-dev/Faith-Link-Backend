@@ -14,6 +14,7 @@ Never read at start: src/, test/, node_modules, CHANGELOG.md, archive.md. Open t
 - Read by symbol or line range, never whole files unless small. Skip anything under "Do not re-read".
 - No broad searches. Targeted grep only, output capped (`| head -30`). Quiet test/build reporters; show failures only.
 - Load a skill from `.agents/skills/` only when the task matches it, never the whole set.
+- **`FAITHLINK_MVP_ARCHITECTURE_PLAN.md` is 1500+ lines — never read it in full.** To confirm scope for a phase, grep for its exact top-level heading (e.g. `# 11. Phase 5` or `# 12. Phase 6`) to get the start line, then read only that block. Stop reading when you hit the next `# ` top-level heading. Do not read adjacent phases or cross-section content.
 
 ## 3. Files, roles, caps (create only when there's real content; no empty skeletons)
 - `.agents/working.md` (hot, ≤60 lines): Current State line · Handoff · Open risks · last 2-3 task entries in full · older ones as one line each.
@@ -77,6 +78,17 @@ Hooks and subagents: don't assume either exists. If the harness supports subagen
 
 Logging: record any ECC rule that shapes a design decision in DECISIONS.md as one line. Don't copy rule text into any log file.
 
+## 9. Phase Scope Authority
+`docs/AI/FAITHLINK_MVP_ARCHITECTURE_PLAN.md` is the single source of truth for what each phase must build. Never derive scope from memory, `NEXT_TASKS.md`, or `working.md` alone.
+
+**Before starting any phase:**
+1. Grep `FAITHLINK_MVP_ARCHITECTURE_PLAN.md` for the phase's top-level heading to get its line number.
+   Example: `Select-String -Path ... -Pattern "^# \d+\. Phase 6"` (Windows) or `grep -n "^# [0-9]*\. Phase 6"` (Unix).
+2. Read only that section (start line → next `# ` heading). Stop there.
+3. Derive: goal, data concepts, API endpoints, edge cases, and completion criteria — all from that section only.
+4. If the plan and `working.md`/`NEXT_TASKS.md` conflict, **the plan wins**. Log the discrepancy as a decision in working.md and correct the other file before writing code.
+5. Never read adjacent phase sections "for context" — load them only if the current phase explicitly references them.
+
 ## 10. Session hygiene
 - At a phase boundary, update Handoff, then tell me it's a good point to start a fresh session.
 - If your context is getting heavy or you've lost the thread, stop and tell me instead of continuing.
@@ -84,7 +96,8 @@ Logging: record any ECC rule that shapes a design decision in DECISIONS.md as on
 
 ## 11. Rule conflicts and gaps
 - If a rule file is missing, outdated, or contradicts the codebase, follow the codebase, log one line in DECISIONS.md, and don't try to fix the rule files.
-- Suggest rule changes to me; don't edit rule files or AGENTS.md yourself.
+- Suggest rule changes to me; don't edit AGENTS.md unilaterally. **Exception: when I explicitly instruct an edit to AGENTS.md, make it — then confirm what changed.**
+- If any rule in this file conflicts with §9 (Phase Scope Authority), §9 wins. Log the conflict as a one-line decision in working.md.
 
 ## 12. Doc Map & Read Routing
 Start-up reads stay minimal (§1). Never read documentation in bulk.
