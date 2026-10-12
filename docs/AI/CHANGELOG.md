@@ -1,5 +1,15 @@
 # Changelog — FaithLink Backend
 
+## [2026-10-12] Phase 5 — Quizzes & Question Engine
+- Extended `src/db/schema.ts` with `quizzes`, `quiz_questions`, `quiz_options` tables (soft-delete, scoring seams for Phase 6).
+- Applied migration directly to Neon `production` branch via MCP `run_sql_transaction`.
+- Created Zod validation in `src/validation/quiz.ts` (createQuizSchema, updateQuizSchema, quizIdParamSchema).
+- Created service layer `src/services/quiz.ts` with transactional create, full-replace update, soft-delete.
+- Created `src/routes/quiz.ts` with GET list, GET detail, POST create, PUT update, DELETE (soft) — all guarded by `requireAuth` + `requireTenantRole`.
+- Mounted `quizRouter` at `/api/churches` in `src/index.ts`.
+- All 14 integration tests passing (`test/quiz.test.ts`). `tsc --noEmit` clean (exit 0).
+- Deployed to Neon Serverless Cloud; live endpoints verified.
+
 ## [2026-09-28]
 - Initialized Neon project `crimson-forest-33142254` (branch `production`).
 - Enabled Neon Auth and deployed initial `api` serverless function.

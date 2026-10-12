@@ -4,6 +4,7 @@ import { logger } from "hono/logger";
 import { profileRouter } from "./routes/profile.js";
 import { churchRouter } from "./routes/church.js";
 import { lessonRouter } from "./routes/lesson.js";
+import { quizRouter } from "./routes/quiz.js";
 
 const app = new Hono();
 
@@ -36,6 +37,7 @@ app.get("/", (c) => {
 app.route("/api", profileRouter);
 app.route("/api/churches", churchRouter);
 app.route("/api/churches", lessonRouter);
+app.route("/api/churches", quizRouter);
 
 
 // Global safe error handler

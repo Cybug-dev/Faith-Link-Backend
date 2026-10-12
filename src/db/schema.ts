@@ -5,6 +5,7 @@ import {
   timestamp,
   uuid,
   integer,
+  boolean,
   uniqueIndex,
   index,
 } from "drizzle-orm/pg-core";
@@ -137,4 +138,99 @@ export type Lesson = typeof lessons.$inferSelect;
 export type NewLesson = typeof lessons.$inferInsert;
 export type LessonCompletion = typeof lessonCompletions.$inferSelect;
 export type NewLessonCompletion = typeof lessonCompletions.$inferInsert;
+
+/**
+ * Quizzes in public schema.
+ * Church-scoped quizzes, optionally linked to a lesson.
+ * passingScore is a seam for Phase 6 scoring; null means no pass threshold enforced.
+ * deletedAt enables soft-delete so historical quiz_attempts (Phase 6) remain intact.
+ */
+export const quizzes = pgTable(
+  "quizzes",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    churchId: uuid("church_id")
+      .notNull()
+      .references(() => churches.id, { onDelete: "cascade" }),
+    /** Optional: link quiz to a specific lesson for curriculum flow. */
+    lessonId: uuid("lesson_id").references(() => lessons.id, { onDelete: "set null" }),
+    title: varchar("title", { length: 255 }).notNull(),
+    description: text("description"),
+    /** draft | published | archived — mirrors lessons.status pattern. */
+    status: varchar("status", { length: 50 }).notNull().default("draft"),
+    /** Seam for Phase 6 scoring: 0–100 percentage threshold, null = ungraded. */
+    passingScore: integer("passing_score"),
+    orderIndex: integer("order_index").notNull().default(0),
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => profiles.userId, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+    /** Soft-delete: preserves historical attempt data from Phase 6. */
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("quizzes_church_idx").on(table.churchId),
+    index("quizzes_lesson_idx").on(table.lessonId),
+    index("quizzes_status_idx").on(table.status),
+  ]
+);
+
+/**
+ * Quiz Questions in public schema.
+ * Ordered questions within a quiz. Hard-deleted with parent quiz (cascade).
+ * pointValue is a seam for Phase 6 weighted scoring; default 1.
+ */
+export const quizQuestions = pgTable(
+  "quiz_questions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    quizId: uuid("quiz_id")
+      .notNull()
+      .references(() => quizzes.id, { onDelete: "cascade" }),
+    text: text("text").notNull(),
+    /** Seam for Phase 6: points awarded for a correct answer. */
+    pointValue: integer("point_value").notNull().default(1),
+    orderIndex: integer("order_index").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+    /** Soft-delete: retains question text in historical attempt records. */
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("quiz_questions_quiz_idx").on(table.quizId),
+  ]
+);
+
+/**
+ * Quiz Options in public schema.
+ * Answer choices for a quiz question. isCorrect drives Phase 6 answer scoring.
+ * Hard-deleted with parent question (cascade).
+ */
+export const quizOptions = pgTable(
+  "quiz_options",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    questionId: uuid("question_id")
+      .notNull()
+      .references(() => quizQuestions.id, { onDelete: "cascade" }),
+    text: text("text").notNull(),
+    /** True for the correct answer choice(s); consumed by Phase 6 scoring. */
+    isCorrect: boolean("is_correct").notNull().default(false),
+    orderIndex: integer("order_index").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("quiz_options_question_idx").on(table.questionId),
+  ]
+);
+
+export type Quiz = typeof quizzes.$inferSelect;
+export type NewQuiz = typeof quizzes.$inferInsert;
+export type QuizQuestion = typeof quizQuestions.$inferSelect;
+export type NewQuizQuestion = typeof quizQuestions.$inferInsert;
+export type QuizOption = typeof quizOptions.$inferSelect;
+export type NewQuizOption = typeof quizOptions.$inferInsert;
+
 

@@ -80,10 +80,30 @@ Implement FaithLink Phase 4: Learning Content (Lessons & Progress Engine) with t
 - None.
 
 ## Handoff
-- **Last completed:** Phase 4: Learning Content (All 7 steps completed, tested, and deployed)
-- **Currently doing:** Ready for Phase 5 (Quizzes & Question Engine)
-- **Next action:** Implement Phase 5 per MVP roadmap when requested
+- **Last completed:** Phase 5: Quizzes & Question Engine (all 7 steps completed, 14 tests passing, deployed)
+- **Currently doing:** Idle — Phase 5 complete
+- **Next action:** Implement Phase 6 (Submissions & Scoring) when requested
 
+## Phase 5 Task Log
+### [2026-10-12 13:06–14:27] Phase 5 — Quizzes & Question Engine
+- **Files:** `src/db/schema.ts`, `src/validation/quiz.ts`, `src/services/quiz.ts`, `src/routes/quiz.ts`, `src/index.ts`, `test/quiz.test.ts`, `docs/AI/*`
+- **Goal:** Quiz authoring + delivery with scoring seams for Phase 6
+- **Change:** 3 schema tables (quizzes/quiz_questions/quiz_options), migration applied to Neon production, Zod schemas, service layer, 5 REST endpoints, 14 tests, deployed
+- **Status:** ✅ Success
+- **Verification:** tsc clean, 14/14 tests pass, live 401 on unauthenticated quiz endpoint confirmed
 
+## Phase 5 Decisions
+- Service layer introduced (quiz.ts) — 3-table transactional create exceeds inline-route complexity threshold
+- Full-replace strategy for question updates — simpler than patch-by-ID for nested resources
+- Soft-delete on quizzes + questions — Phase 6 attempt records will reference these IDs
+- lessonId `ON DELETE SET NULL` — quiz survives lesson deletion, remains independently usable
 
+## Phase 5 Edge Cases
+| Case | Impact | Status |
+| :--- | :--- | :--- |
+| Quiz created with zero questions | Invalid state | Handled (Zod min(1) on questions array) |
+| Question with < 2 options | Ambiguous quiz | Handled (Zod min(2) on options array) |
+| Member reads draft quiz | Content leak | Handled (404 masking, mirrors lesson pattern) |
+| Leader deletes quiz with future attempts (Phase 6) | Orphaned attempt data | Handled (soft-delete preserves rows) |
+| Lesson deleted while quiz linked | FK violation | Handled (ON DELETE SET NULL on lessonId) |
 
