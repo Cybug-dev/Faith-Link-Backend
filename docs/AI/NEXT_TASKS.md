@@ -10,16 +10,17 @@
   - Endpoints: `POST /api/churches/:id/quizzes/:quizId/attempts`, `GET /api/churches/:id/attempts/:attemptId`, `POST /api/churches/:id/attempts/:attemptId/answers`, `POST /api/churches/:id/attempts/:attemptId/complete`, `GET /api/me/quiz-history`, `GET /api/churches/:id/quizzes/:quizId/attempts`.
   - Service layer with transactional scoring, 25 tests passing (14 quiz + 11 attempts), deployed to Neon Cloud.
 
+- [x] Phase 6: Results, Progress & Achievements
+  - Schema: `user_achievements` (unlocked milestones per user).
+  - Service: `src/services/progress.ts` (achievement evaluation, streak calculation, unified activity).
+  - Endpoints: `GET /api/me/progress`, `GET /api/me/achievements`, `GET /api/me/stats`.
+  - Automated test suite `test/progress-achievements.test.ts` (6 tests passing), deployed to Neon Cloud.
+
 ## Active & Upcoming Work (FaithLink MVP Roadmap)
-- [ ] Phase 6: Results, Progress & Achievements (per FAITHLINK_MVP_ARCHITECTURE_PLAN.md §12)
-  - Results: Enriched score, correct/incorrect summary, completion status, basic performance feedback, optional explanations.
-  - Progress: Aggregated learning activity (lessons completed, quizzes completed, best quiz scores, recent activity).
-  - Achievements: Server-trusted awards (`First Lesson Completed`, `First Quiz Completed`, `Perfect Score`, `Completed 5 Lessons`, `Completed 10 Quizzes`).
-  - Endpoints:
-    - `GET /api/me/progress` (unified learning & quiz progress)
-    - `GET /api/me/achievements` (user achievements list & unlocked state)
-    - `GET /api/me/stats` (summary stats)
-- [ ] Phase 7: Leaderboard / Scoreboard (`GET /api/churches/:id/leaderboard`, per FAITHLINK_MVP_ARCHITECTURE_PLAN.md §13)
+- [ ] Phase 7: Leaderboard / Scoreboard (per FAITHLINK_MVP_ARCHITECTURE_PLAN.md §13)
+  - Church & community leaderboard aggregation.
+  - Endpoint: `GET /api/churches/:id/leaderboard` (timeframes: all-time, monthly, weekly; points/percentage ranking).
+  - Privacy & teen safety rules: display names only, option to opt out or show initials.
 - [ ] Phase 8: Activities & Events (per FAITHLINK_MVP_ARCHITECTURE_PLAN.md §14)
 - [ ] Phase 9: MVP Integration & Hardening (per FAITHLINK_MVP_ARCHITECTURE_PLAN.md §15)
 

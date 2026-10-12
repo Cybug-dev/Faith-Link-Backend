@@ -13,6 +13,7 @@ import {
   type QuizAnswer,
 } from "../db/schema.js";
 import type { CreateQuizInput, UpdateQuizInput } from "../validation/quiz.js";
+import { syncUserAchievements } from "./progress.js";
 
 // ---------------------------------------------------------------------------
 // Read types
@@ -564,7 +565,7 @@ export async function completeQuizAttempt(
   churchId: string,
   userId: string
 ): Promise<QuizAttempt> {
-  return db.transaction(async (tx) => {
+  const result = await db.transaction(async (tx) => {
     // 1. Fetch attempt with quiz info
     const [row] = await tx
       .select({
@@ -634,6 +635,13 @@ export async function completeQuizAttempt(
 
     return completed;
   });
+
+  // Evaluate achievements in background
+  syncUserAchievements(userId).catch((err) =>
+    console.error("Error evaluating achievements on quiz completion:", err)
+  );
+
+  return result;
 }
 
 /**

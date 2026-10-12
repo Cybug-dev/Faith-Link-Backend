@@ -1,5 +1,19 @@
 # Changelog — FaithLink Backend
 
+## [2026-10-13] Phase 6 — Results, Progress & Achievements
+- Added `user_achievements` table in Drizzle schema with unique index `(user_id, achievement_key)` and applied migration to Neon PostgreSQL.
+- Implemented `src/services/progress.ts` with:
+  - 5 deterministic MVP achievement definitions (`first_lesson_completed`, `first_quiz_completed`, `perfect_score`, `completed_5_lessons`, `completed_10_quizzes`).
+  - Learning streak calculation tracking consecutive active days with date normalization.
+  - Server-authoritative achievement evaluation triggered on quiz/lesson completions and progress reads.
+  - Chronological unified recent activity feed across lessons and quizzes.
+- Implemented and mounted endpoints:
+  - `GET /api/me/progress` (unified lessons + quizzes + streak + best scores + recent activity)
+  - `GET /api/me/achievements` (unlocked state and available badges)
+  - `GET /api/me/stats` (aggregated user learning metrics)
+- Created integration test suite `test/progress-achievements.test.ts` (all 6 tests passing).
+- Deployed updated serverless function to Neon Cloud.
+
 ## [2026-10-12] Phase 5 — Bible Quiz Engine (Authoring + Attempts & Scoring)
 - Part 1 (Authoring): Created `quizzes`, `quiz_questions`, `quiz_options` with Zod validation, transactional service layer, role guards, and endpoints under `/api/churches/:id/quizzes`.
 - Part 2 (Attempts & Scoring):

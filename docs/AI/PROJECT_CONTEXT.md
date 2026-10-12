@@ -27,9 +27,10 @@ FaithLink is a production-grade, multi-tenant digital engagement platform for ch
 | 0–3 | Auth, Profiles, Churches, Tenant RBAC | ✅ Live |
 | 4 | Learning Content (lessons, completions, progress) | ✅ Live |
 | 5 | Bible Quiz Engine (quizzes, questions, attempts, answers) | ✅ Live |
+| 6 | Results, Progress & Achievements (streaks, stats, milestones) | ✅ Live |
 
 ## Active DB Tables (public schema)
-`profiles`, `churches`, `church_members`, `lessons`, `lesson_completions`, `quizzes`, `quiz_questions`, `quiz_options`, `quiz_attempts`, `quiz_answers`
+`profiles`, `churches`, `church_members`, `lessons`, `lesson_completions`, `quizzes`, `quiz_questions`, `quiz_options`, `quiz_attempts`, `quiz_answers`, `user_achievements`
 
 ## Key Conventions
 - Routes mounted at `/api/churches` for church-scoped resources
@@ -60,3 +61,4 @@ FaithLink is a production-grade, multi-tenant digital engagement platform for ch
 | `church-tenant-foundation.md` | Phase 2–3 church CRUD + RBAC: status, goal, UX, architecture, endpoints, DB, validation & security, tests |
 | `learning-content-foundation.md` | Phase 4 lessons & progress: status, goal, UX, architecture, endpoints, DB, tests |
 | `quizzes-question-engine.md` | Phase 5 quiz engine: summary, scope, DB tables, endpoints, files, design decisions, Phase 6 seams |
+| `progress-and-achievements.md` | Phase 6 results, progress & achievements: summary, scope, DB tables, endpoints, milestones |

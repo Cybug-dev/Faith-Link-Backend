@@ -4,6 +4,11 @@ import { db } from "../db/index.js";
 import { profiles, churchMembers, churches, lessonCompletions, lessons } from "../db/schema.js";
 import { requireAuth, type AuthContext } from "../middleware/auth.js";
 import { getUserQuizHistory } from "../services/quiz.js";
+import {
+  getUserProgress,
+  getUserAchievements,
+  getUserStats,
+} from "../services/progress.js";
 
 export const profileRouter = new Hono<AuthContext>();
 
@@ -109,32 +114,52 @@ profileRouter.put("/me", async (c) => {
 
 /**
  * GET /api/me/progress
- * Retrieves learning progress and completed lessons across churches for the authenticated user.
+ * Retrieves comprehensive learning and quiz progress, streaks, best scores, and recent activity.
  */
 profileRouter.get("/me/progress", async (c) => {
   const userId = c.get("userId");
+  const churchId = c.req.query("churchId");
 
-  const completions = await db
-    .select({
-      completionId: lessonCompletions.id,
-      lessonId: lessonCompletions.lessonId,
-      lessonTitle: lessons.title,
-      lessonSlug: lessons.slug,
-      churchId: lessonCompletions.churchId,
-      churchName: churches.name,
-      completedAt: lessonCompletions.completedAt,
-    })
-    .from(lessonCompletions)
-    .innerJoin(lessons, eq(lessonCompletions.lessonId, lessons.id))
-    .innerJoin(churches, eq(lessonCompletions.churchId, churches.id))
-    .where(eq(lessonCompletions.userId, userId))
-    .orderBy(desc(lessonCompletions.completedAt));
+  try {
+    const progress = await getUserProgress(userId, churchId);
+    return c.json(progress);
+  } catch (err) {
+    console.error("Error retrieving user progress:", err);
+    return c.json({ error: "Internal Server Error: Failed to retrieve user progress" }, 500);
+  }
+});
 
-  return c.json({
-    userId,
-    totalCompleted: completions.length,
-    completions,
-  });
+/**
+ * GET /api/me/achievements
+ * Retrieves list of achievements and unlocked status for the authenticated user.
+ */
+profileRouter.get("/me/achievements", async (c) => {
+  const userId = c.get("userId");
+
+  try {
+    const achievements = await getUserAchievements(userId);
+    return c.json(achievements);
+  } catch (err) {
+    console.error("Error retrieving user achievements:", err);
+    return c.json({ error: "Internal Server Error: Failed to retrieve user achievements" }, 500);
+  }
+});
+
+/**
+ * GET /api/me/stats
+ * Retrieves aggregated learning and assessment metrics for the authenticated user.
+ */
+profileRouter.get("/me/stats", async (c) => {
+  const userId = c.get("userId");
+  const churchId = c.req.query("churchId");
+
+  try {
+    const stats = await getUserStats(userId, churchId);
+    return c.json(stats);
+  } catch (err) {
+    console.error("Error retrieving user stats:", err);
+    return c.json({ error: "Internal Server Error: Failed to retrieve user stats" }, 500);
+  }
 });
 
 /**

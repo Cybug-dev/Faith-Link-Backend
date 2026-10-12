@@ -9,6 +9,7 @@ import {
   updateLessonSchema,
   lessonIdParamSchema,
 } from "../validation/lesson.js";
+import { syncUserAchievements } from "../services/progress.js";
 
 export const lessonRouter = new Hono<TenantContext>();
 
@@ -356,6 +357,12 @@ lessonRouter.post("/:id/lessons/:lessonId/complete", requireAuth, requireTenantR
         isCompleted: true,
         completedAt: existing?.completedAt ? existing.completedAt.toISOString() : null,
       });
+    }
+
+    if (inserted) {
+      syncUserAchievements(userId).catch((err) =>
+        console.error("Error evaluating achievements on lesson completion:", err)
+      );
     }
 
     return c.json(

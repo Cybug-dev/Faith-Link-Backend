@@ -303,4 +303,28 @@ export type NewQuizAttempt = typeof quizAttempts.$inferInsert;
 export type QuizAnswer = typeof quizAnswers.$inferSelect;
 export type NewQuizAnswer = typeof quizAnswers.$inferInsert;
 
+/**
+ * User Achievements in public schema.
+ * Stores unlocked badges/achievements for users based on server-evaluated milestones.
+ */
+export const userAchievements = pgTable(
+  "user_achievements",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => profiles.userId, { onDelete: "cascade" }),
+    achievementKey: varchar("achievement_key", { length: 100 }).notNull(),
+    unlockedAt: timestamp("unlocked_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("user_achievements_user_key_idx").on(table.userId, table.achievementKey),
+    index("user_achievements_user_idx").on(table.userId),
+  ]
+);
+
+export type UserAchievement = typeof userAchievements.$inferSelect;
+export type NewUserAchievement = typeof userAchievements.$inferInsert;
+
+
 
