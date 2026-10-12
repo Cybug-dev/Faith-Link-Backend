@@ -86,5 +86,33 @@ Logging: record any ECC rule that shapes a design decision in DECISIONS.md as on
 - If a rule file is missing, outdated, or contradicts the codebase, follow the codebase, log one line in DECISIONS.md, and don't try to fix the rule files.
 - Suggest rule changes to me; don't edit rule files or AGENTS.md yourself.
 
-## 12. Final summary
+## 12. Doc Map & Read Routing
+Start-up reads stay minimal (§1). Never read documentation in bulk.
+
+Doc Map & Routing Rules
+Doc Map: Located in PROJECT_CONTEXT.md (part of its 80-line cap). Format: path | scope | trigger. Keep current. If missing, bootstrap using headings only (grep -n "^#" <file> | head -30), never full contents.
+
+Task-Based Routing (Read targeted sections only, never whole files):
+Feature work: docs/AI/FEATURES/README.md -> specific feature file.
+Structural changes: Relevant section of docs/AI/ARCHITECTURE.md.
+Scope/MVP questions: Relevant section of docs/AI/FAITHLINK_MVP_ARCHITEC*.md.
+Routine function fix: None required (Handoff anchor suffices).
+Authority Hierarchy
+When sources conflict, precedence flows top-to-bottom:
+Latest instruction
+DECISIONS.md (Active)
+ARCHITECTURE.md / MVP architecture doc
+Feature files
+PROJECT_CONTEXT.md
+working.md (State only, non-authoritative)
+Design vs. Code: Do not guess. Log discrepancies in working.md as needs decision and ask before modifying code or docs.
+
+Synchronization & Exclusions
+Syncing: Update feature status/notes (1-2 lines) in the same step code changes. Never rewrite design docs; propose changes first.
+Exclusions (Do Not Read Unless Tasked):
+package-lock.json, skills-lock.json, node_modules/
+drizzle/ (except newest migration)
+ECC/ (rule files only per §9; never scan folder)
+
+## 13. Final summary
 Steps completed · files changed · unverified items · unresolved edge cases and risks · future considerations (≤3 lines).
