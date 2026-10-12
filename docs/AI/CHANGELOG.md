@@ -31,3 +31,20 @@
 - Added test suite `test/church.test.ts` with 9 automated integration checks covering unauthenticated requests, UUID format checks, not found errors, and tenant role authorization guards.
 - Deployed to Neon Serverless Cloud (`production` branch) and verified live endpoints.
 
+## [2026-10-12]
+- Implemented Phase 4: Learning Content (Lessons & Progress Engine).
+- Added `lessons` and `lesson_completions` tables to Drizzle schema (`src/db/schema.ts`) with multi-tenant foreign keys and composite unique indexes.
+- Applied schema migration to Neon Postgres `production` branch.
+- Added strict Zod schemas in `src/validation/lesson.ts` (`createLessonSchema`, `updateLessonSchema`, `lessonIdParamSchema`).
+- Created lesson routes in `src/routes/lesson.ts`:
+  - `GET /api/churches/:id/lessons`: Lists lessons for church members, enriches with user completion state, filters drafts for non-leaders.
+  - `GET /api/churches/:id/lessons/:lessonId`: Fetches single lesson with completion state.
+  - `POST /api/churches/:id/lessons`: Authoring endpoint guarded by `requireTenantRole(['admin', 'pastor', 'leader'])`.
+  - `PUT /api/churches/:id/lessons/:lessonId`: Update endpoint guarded by `requireTenantRole(['admin', 'pastor', 'leader'])`.
+  - `POST /api/churches/:id/lessons/:lessonId/complete`: Idempotent lesson completion tracking for church members.
+- Added `GET /api/me/progress` in `src/routes/profile.ts` returning user learning completions across all churches.
+- Scoped profile router auth with `profileRouter.use("/me/*", requireAuth)`.
+- Created automated integration test suite in `test/lesson.test.ts` (10 tests passing).
+- Deployed updated serverless function to Neon Cloud and verified live endpoints.
+
+

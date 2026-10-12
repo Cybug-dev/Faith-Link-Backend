@@ -8,6 +8,13 @@
       "when": 1791384459800,
       "tag": "0000_vengeful_red_ghost",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791794268730,
+      "tag": "0001_exotic_mongoose",
+      "breakpoints": true
     }
   ]
 }

@@ -1,12 +1,13 @@
-﻿import { Hono } from "hono";
-import { eq } from "drizzle-orm";
+import { Hono } from "hono";
+import { eq, desc } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { profiles, churchMembers, churches } from "../db/schema.js";
+import { profiles, churchMembers, churches, lessonCompletions, lessons } from "../db/schema.js";
 import { requireAuth, type AuthContext } from "../middleware/auth.js";
 
 export const profileRouter = new Hono<AuthContext>();
 
 profileRouter.use("/me", requireAuth);
+profileRouter.use("/me/*", requireAuth);
 
 /**
  * GET /api/me
@@ -104,3 +105,34 @@ profileRouter.put("/me", async (c) => {
     profile: updatedProfile,
   });
 });
+
+/**
+ * GET /api/me/progress
+ * Retrieves learning progress and completed lessons across churches for the authenticated user.
+ */
+profileRouter.get("/me/progress", async (c) => {
+  const userId = c.get("userId");
+
+  const completions = await db
+    .select({
+      completionId: lessonCompletions.id,
+      lessonId: lessonCompletions.lessonId,
+      lessonTitle: lessons.title,
+      lessonSlug: lessons.slug,
+      churchId: lessonCompletions.churchId,
+      churchName: churches.name,
+      completedAt: lessonCompletions.completedAt,
+    })
+    .from(lessonCompletions)
+    .innerJoin(lessons, eq(lessonCompletions.lessonId, lessons.id))
+    .innerJoin(churches, eq(lessonCompletions.churchId, churches.id))
+    .where(eq(lessonCompletions.userId, userId))
+    .orderBy(desc(lessonCompletions.completedAt));
+
+  return c.json({
+    userId,
+    totalCompleted: completions.length,
+    completions,
+  });
+});
+

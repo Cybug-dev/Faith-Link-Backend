@@ -12,17 +12,22 @@
 - [x] Implemented reusable tenant authorization guard `requireTenantRole` (`src/middleware/tenant.ts`).
 - [x] Created and verified 9 automated unit/integration test cases in `test/church.test.ts`.
 - [x] Deployed updated `api` function to Neon Cloud compute and verified live endpoints.
+- [x] Phase 4: Learning Content / Lessons
+  - Schema for `lessons`, `lesson_completions` scoped to church tenant with foreign keys and unique constraints.
+  - Endpoints: `GET /api/churches/:id/lessons`, `GET /api/churches/:id/lessons/:lessonId`.
+  - Authoring & management: `POST /api/churches/:id/lessons`, `PUT /api/churches/:id/lessons/:lessonId` (guarded by `requireTenantRole(['admin', 'pastor', 'leader'])`).
+  - Member lesson completion tracking: `POST /api/churches/:id/lessons/:lessonId/complete` (idempotent).
+  - Global progress tracking: `GET /api/me/progress`.
+  - Created automated test suite `test/lesson.test.ts` (10 tests passing).
+  - Deployed to Neon Serverless Cloud and verified live.
 
 ## Active & Upcoming Work (FaithLink MVP Roadmap)
-- [ ] Phase 4: Learning Content / Lessons
-  - Schema for `lessons`, `lesson_completions` scoped to church tenant.
-  - Endpoints: `GET /api/churches/:id/lessons`, `GET /api/churches/:id/lessons/:lessonId`.
-  - Admin/Pastor/Leader authoring: `POST /api/churches/:id/lessons`, `PUT /api/churches/:id/lessons/:lessonId`.
-  - Member lesson completion tracking: `POST /api/churches/:id/lessons/:lessonId/complete`.
 - [ ] Phase 5: Quizzes & Question Engine
-  - Schema for `quizzes`, `quiz_questions`, `quiz_options`.
-  - Authoring and retrieval endpoints for quizzes.
+  - Schema for `quizzes`, `quiz_questions`, `quiz_options` (scoped to church tenant and optional lesson link).
+  - Endpoints: `GET /api/churches/:id/quizzes`, `GET /api/churches/:id/quizzes/:quizId`.
+  - Admin/Pastor/Leader quiz authoring: `POST /api/churches/:id/quizzes`, `PUT /api/churches/:id/quizzes/:quizId`.
 - [ ] Phase 6: Submissions & Scoring
   - Student quiz submission processing, answer scoring, and feedback.
 - [ ] Phase 7: Progress & Gamification (Leaderboards & Points).
+
 

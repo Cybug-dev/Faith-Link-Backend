@@ -1,83 +1,89 @@
 # Working Log
 
 ## Objective
-Implement Church Tenant Foundation: church creation (transactional with admin membership), church retrieval (public vs member view), church joining (role: member), and tenant role authorization guard.
-
-## Architecture constraints
-- Stack: TypeScript + Neon Serverless Functions + Node.js 24 + Hono + Drizzle + PostgreSQL + Neon Auth.
-- Do NOT introduce Express, Prisma, Cloudinary, Redis, Socket.IO, or another service.
-- Strict multi-tenancy: users cannot cross-access church data; server-side role validation.
-- Do NOT run destructive git commands. Do not commit unless requested.
+Implement FaithLink Phase 4: Learning Content (Lessons & Progress Engine) with tenant-scoped lessons, role-based authoring, member progress/completion tracking, and Zod validation.
 
 ## Plan
-- [x] Step 1: Install Zod and create validation schemas (`src/validation/church.ts`)  ✅
-- [x] Step 2: Implement reusable tenant authorization guard (`src/middleware/tenant.ts`)  ✅
-- [x] Step 3: Implement church routes (`src/routes/church.ts`) and mount in `src/index.ts`  ✅
-- [x] Step 4: Run test suite and verify edge cases (`test/church.test.ts`)  ✅
+- [x] Step 1: Update Drizzle schema (`src/db/schema.ts`) with `lessons` and `lesson_completions`, generate and apply migration  ✅
+- [x] Step 2: Implement Zod validation schemas (`src/validation/lesson.ts`)  ✅
+- [x] Step 3: Implement lesson routes (`src/routes/lesson.ts`) and progress endpoint (`GET /api/me/progress`), mount in `src/index.ts`  ✅
+- [x] Step 4: Add and run integration test suite (`test/lesson.test.ts`)  ✅
 - [x] Step 5: Typecheck with `tsc --noEmit`  ✅
-- [x] Step 6: Deploy to Neon Cloud (`neon deploy`) and live test  ✅
-- [x] Step 7: Update AI docs (`FEATURES/church-tenant-foundation.md`, `CHANGELOG.md`, `NEXT_TASKS.md`)  ✅
+- [x] Step 6: Deploy to Neon Cloud (`neon deploy`) and verify live endpoints  ✅
+- [x] Step 7: Update AI docs (`docs/AI/CHANGELOG.md`, `docs/AI/NEXT_TASKS.md`, `docs/AI/FEATURES/learning-content-foundation.md`)  ✅
 
 ## Task Log
-### [2026-10-09 21:20] Step 1: Install Zod and create validation schemas
-- **File(s):** `package.json`, `src/validation/church.ts`
-- **Goal:** Validate church payload and UUID params
-- **Action taken:** Installed `zod`, created `createChurchSchema` and `churchIdParamSchema`.
+### [2026-10-12 09:40] Step 1: Update Drizzle schema and migrations
+- **File(s):** `src/db/schema.ts`, `drizzle/0001_exotic_mongoose.sql`
+- **Goal:** Define `lessons` and `lesson_completions` tables with foreign keys and unique constraints, generate migration, and apply to Neon Postgres.
+- **Action taken:** Added `lessons` and `lesson_completions` to `schema.ts`. Generated migration with `drizzle-kit`. Applied schema changes to Neon project `crimson-forest-33142254` via `run_sql_transaction`.
 - **Status:** ✅ Success
-- **Verification:** TypeScript compilation checked.
+- **Verification:** Verified tables `public.lessons` and `public.lesson_completions` in live database via Neon MCP `get_database_tables`.
 
-### [2026-10-09 21:22] Step 2: Reusable tenant authorization middleware
-- **File(s):** `src/middleware/tenant.ts`
-- **Goal:** Guard endpoints by checking active membership and roles in target church
-- **Action taken:** Created `requireTenantRole(allowedRoles)` querying `church_members` with tenant scoping.
+### [2026-10-12 09:46] Step 2: Implement Zod validation schemas
+- **File(s):** `src/validation/lesson.ts`
+- **Goal:** Implement strict Zod schemas for lesson creation, updating, and route parameters.
+- **Action taken:** Created `createLessonSchema`, `updateLessonSchema`, and `lessonIdParamSchema`.
 - **Status:** ✅ Success
-- **Verification:** Unit test verified rejection of non-members (403) and invalid UUIDs (400).
+- **Verification:** Zod validation structures verified.
 
-### [2026-10-09 21:25] Step 3: Church endpoints and router mounting
-- **File(s):** `src/routes/church.ts`, `src/routes/profile.ts`, `src/index.ts`
-- **Goal:** Implement `POST /`, `GET /:id`, `POST /:id/join`, `GET /:id/members`
-- **Action taken:** Implemented atomic transactional church creation, public vs member view, join with hardcoded role 'member', and members listing guarded by `requireTenantRole`. Scoped profile router to `/me`. Mounted in `src/index.ts`.
+### [2026-10-12 09:50] Step 3: Implement lesson routes and progress endpoints
+- **File(s):** `src/routes/lesson.ts`, `src/routes/profile.ts`, `src/index.ts`
+- **Goal:** Create Hono routes for lesson listing, details, authoring, editing, completion tracking, and overall user progress.
+- **Action taken:** Created `lessonRouter` with `GET /:id/lessons`, `GET /:id/lessons/:lessonId`, `POST /:id/lessons`, `PUT /:id/lessons/:lessonId`, `POST /:id/lessons/:lessonId/complete`. Added `GET /me/progress` in `profileRouter`. Mounted `lessonRouter` at `/api/churches` in `src/index.ts`.
 - **Status:** ✅ Success
-- **Verification:** Integration tests verified all route definitions.
+- **Verification:** `tsc --noEmit` passed with 0 errors.
 
-### [2026-10-09 21:30] Step 4: Run test suite
-- **File(s):** `test/church.test.ts`
-- **Goal:** Execute integration test script covering health, unauthenticated access, invalid UUIDs, 404s, Zod validation, and tenant guard.
-- **Action taken:** Executed `node --env-file=.env.local --import=tsx test/church.test.ts`.
+### [2026-10-12 09:55] Step 4: Add and run integration test suite
+- **File(s):** `test/lesson.test.ts`
+- **Goal:** Comprehensive tests for lesson validation, authoring, publishing, completion, and tenant isolation.
+- **Action taken:** Created and executed `test/lesson.test.ts` (10 tests). Re-ran `test/church.test.ts` (9 tests).
 - **Status:** ✅ Success
-- **Verification:** All 9 integration checks passed.
+- **Verification:** All 10 lesson integration tests passed. All 9 church tests passed without regression.
 
-### [2026-10-09 21:31] Step 5: Typecheck with `tsc --noEmit`
+### [2026-10-12 09:58] Step 5: Typecheck with `tsc --noEmit`
 - **File(s):** Whole project
 - **Goal:** Zero TypeScript compilation errors
 - **Action taken:** Ran `npx tsc --noEmit`.
 - **Status:** ✅ Success
-- **Verification:** Command exited with code 0.
+- **Verification:** Exited with code 0.
 
-### [2026-10-09 21:32] Step 6: Deploy to Neon Cloud
-- **File(s):** `neon.ts`, cloud deployment
-- **Goal:** Deploy new function bundle and test live
-- **Action taken:** Ran `neon deploy`. Applied changes to function `api` on branch `production`. Tested live endpoints via Node.js fetch against `https://br-soft-butterfly-b482q79w-api.compute.c-6.us-east-2.aws.neon.tech/`.
+### [2026-10-12 10:00] Step 6: Deploy to Neon Cloud
+- **File(s):** Neon Serverless Functions (`api`)
+- **Goal:** Deploy updated bundle to Neon Cloud and test live endpoints.
+- **Action taken:** Executed `neon deploy` successfully. Tested live endpoints (`GET /health`, `GET /api/me/progress`, `GET /api/churches/:id/lessons`, `POST /api/churches/:id/lessons`, `POST /api/churches/:id/lessons/:lessonId/complete`).
 - **Status:** ✅ Success
-- **Verification:** Live invocation confirmed `GET /health` (200), `GET /api/churches/invalid-uuid` (400), `POST /api/churches` (401), `GET /api/churches/:id` not found (404).
+- **Verification:** Live invocation confirmed 200 OK and expected 401 Unauthorized responses on protected endpoints.
 
-### [2026-10-09 21:35] Step 7: Update AI docs
-- **File(s):** `docs/AI/FEATURES/church-tenant-foundation.md`, `docs/AI/CHANGELOG.md`, `docs/AI/NEXT_TASKS.md`
-- **Goal:** Document implemented church tenant foundation feature, update changelog, and update task queue
-- **Action taken:** Updated `FEATURES/church-tenant-foundation.md` to Completed & Verified; added 2026-10-09 entries to `CHANGELOG.md`; updated `NEXT_TASKS.md` moving foundation to completed and outlining Phase 4 (Learning Content / Lessons).
+### [2026-10-12 10:05] Step 7: Update AI docs
+- **File(s):** `docs/AI/CHANGELOG.md`, `docs/AI/NEXT_TASKS.md`, `docs/AI/FEATURES/learning-content-foundation.md`
+- **Goal:** Document Phase 4 Learning Content completion and roadmap progress.
+- **Action taken:** Created `docs/AI/FEATURES/learning-content-foundation.md`. Updated `CHANGELOG.md` with `[2026-10-12]`. Updated `NEXT_TASKS.md` marking Phase 4 complete and staging Phase 5.
 - **Status:** ✅ Success
 - **Verification:** Reviewed updated documentation files.
 
 ## Decisions
-- Used Hono's `app.request` for fast in-process router testing without starting an HTTP listener.
-- Ensured creator's profile exists inside the church creation transaction to satisfy the foreign key on `church_members.user_id`.
-- Scoped `profileRouter.use("/me", requireAuth)` instead of `*` to avoid intercepting `/api/churches` requests.
+- Lessons are tenant-scoped with composite unique index `(church_id, slug)` to allow identical slugs across different churches.
+- `lesson_completions` has composite unique index `(lesson_id, user_id)` for idempotent completion tracking.
+- Draft vs. published filtering: regular members can only retrieve published lessons; church leaders (admin, pastor, leader) can view drafts and published lessons.
 
-## Blockers / Open questions
-- None. All Church Tenant Foundation objectives are satisfied, verified, and deployed.
+## Edge Cases & Risks
+| Case | Impact | Status |
+| :--- | :--- | :--- |
+| Duplicate lesson slug within same church | Database constraint error | Handled (Zod validation + clean 409 Conflict return) |
+| Non-member attempts to read/complete lessons | Data leak or unauthorized progress | Handled (requireTenantRole validates active church membership) |
+| Member from Church A attempts to complete Church B lesson | Cross-tenant corruption | Handled (Verify lesson belongs to target churchId) |
+| Duplicate lesson completion submission | Duplicate record or DB error | Handled (Idempotent: onConflictDoNothing or 200 OK if already completed) |
+| Unpublished lesson accessed by regular member | Content leak | Handled (404/403 if status != 'published' and caller is not leader) |
 
-## Handoff (always keep current)
-- **Last completed:** Step 7 (All planned steps completed)
-- **Currently doing:** Task complete. Ready for next task (Phase 4: Learning Content / Lessons).
-- **Next action:** Proceed to Phase 4 (Learning Content / Lessons) per MVP plan or wait for user instructions.
-- **Uncommitted files:** `package.json`, `package-lock.json`, `src/index.ts`, `src/routes/profile.ts`, `src/validation/church.ts`, `src/middleware/tenant.ts`, `src/routes/church.ts`, `test/church.test.ts`, `working.md`, `docs/AI/FEATURES/church-tenant-foundation.md`, `docs/AI/CHANGELOG.md`, `docs/AI/NEXT_TASKS.md`
+## Blockers / Open Questions
+- None.
+
+## Handoff
+- **Last completed:** Phase 4: Learning Content (All 7 steps completed, tested, and deployed)
+- **Currently doing:** Ready for Phase 5 (Quizzes & Question Engine)
+- **Next action:** Implement Phase 5 per MVP roadmap when requested
+
+
+
+
