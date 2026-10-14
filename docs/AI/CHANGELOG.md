@@ -5,6 +5,7 @@
 - `src/middleware/auth.ts`: `requireAuth` returns 403 when JWT `emailVerified` is not `true` (Zod-validated claim).
 - Google OAuth switched to our own Google client ID/secret on `production` (see DECISIONS ADR 007).
 - Documented frontend auth contract in `FEATURES/auth-and-profile.md`.
+- Verified on a test branch: real JWT has `emailVerified`; unverified sign-in returns 403 `EMAIL_NOT_VERIFIED`; duplicate email creates no second user (ADR 008).
 
 ## [2026-10-13] Phase 6 — Results, Progress & Achievements
 - Added `user_achievements` table in Drizzle schema with unique index `(user_id, achievement_key)` and applied migration to Neon PostgreSQL.

@@ -6,7 +6,9 @@ Auth hardening ⚠️ partly done. Waiting on user: Google client ID/secret, fro
 ## Handoff
 - ✅ Neon Auth production (br-soft-butterfly-b482q79w): OTP verification required, sent on sign-up/sign-in, auto sign-in after verify (CLI `neon neon-auth config email-password update`).
 - ✅ `src/middleware/auth.ts:requireAuth` 403s unless JWT `emailVerified === true` (Zod `verifiedClaimSchema`). `tsc --noEmit` clean. Not deployed (`neon deploy` pending).
-- ⚠️ Unverified: `emailVerified` claim name/presence in a real Neon JWT (only seen in docs example). If absent, all users get 403. Check with a real token before deploy.
+- ✅ Verified on test branch `auth-link-test` (br-gentle-hill-b40xewcx, base ep-winter-moon-b4ngz6hr): real JWT has `emailVerified`; unverified sign-in 403; duplicate sign-up creates no row. Test users authtest1/2@example.com live only on that branch.
+- ✅ Google-link tested live (ecybug@gmail.com): verified→links (credential+google, 1 user); unverified→`account_not_linked`, no takeover. Docs updated. Remaining: ask user before deleting branch auth-link-test; `neon deploy` not run.
+- (done, kept for context) Google-link leg (needs user's Gmail; user must add `https://ep-winter-moon-b4ngz6hr.neonauth.c-6.us-east-2.aws.neon.tech/neondb/auth/callback/google` to Google Cloud redirect URIs) + pre-hijack test. Then ask user before deleting the test branch.
 - ✅ Google: own client ID/secret set via MCP (type standard). Secret was pasted in chat; never written to files. Redirect URI `{NEON_AUTH_BASE_URL}/callback/google` must be registered in Google Cloud (user to confirm).
 - ⏳ Trusted domains empty, allow_localhost on. Frontend not built/hosted yet; add origin(s) when known; turn off localhost for prod. `list_auth_trusted_domains` 404'd with branch name; use branch id.
 - ✅ Frontend auth contract documented in auth-and-profile.md.

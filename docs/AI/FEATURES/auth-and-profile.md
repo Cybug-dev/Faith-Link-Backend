@@ -27,6 +27,14 @@ Frontend uses `@neondatabase/auth` (`createAuthClient(NEON_AUTH_BASE_URL)`; env 
 - Session / out: `getSession()`, `signOut()`. API token: `token()` → send as `Authorization: Bearer <data.token>` to `/api/*`.
 - Google redirect URI (registered in Google Cloud): `{NEON_AUTH_BASE_URL}/callback/google`. `callbackURL` origins must be in Neon trusted domains.
 
+### Behavior verified on a test branch (2026-10-14)
+- JWT payload carries camelCase `emailVerified` (boolean) plus `sub`, `email`, `name`, `role`; it expires ~15 min after issue (re-call `token()`).
+- Unverified sign-in → `403 { code: "EMAIL_NOT_VERIFIED" }`; frontend should route to the OTP screen.
+- Sign-up returns `token: null` until the email is verified.
+- Duplicate email sign-up returns `200` with a decoy user (anti-enumeration) and creates nothing; the existing password is untouched. Do not treat a 200 sign-up as "account created", show "check your email for a code".
+- DB guarantees: `neon_auth.user.email` is UNIQUE; sign-in methods are rows in `neon_auth.account` (`credential`, `google`) under one user, so one email = one user = one `profiles` row.
+- Google sign-in on a password-registered email: if that email is verified it links to the same user (tested: one user, `credential`+`google` accounts); if unverified it is refused with `?error=account_not_linked` and nothing is linked. Frontend: show "verify your email first or sign in with your password". Google never uses the password, so passwords can't conflict. A Google-only user adds a password via reset-password.
+
 ## API Endpoints
 - `GET /health`: Health check endpoint returning status and service timestamp.
 - `GET /api/me`: Returns authenticated user identity, profile, and church memberships.

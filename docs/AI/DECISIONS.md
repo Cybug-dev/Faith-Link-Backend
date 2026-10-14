@@ -27,3 +27,7 @@
 ## ADR 007: Auth Email & Google OAuth Providers
 * **Decision**: Shared Neon SMTP (`auth@mail.myneon.app`) for now; switch to custom SMTP before production launch. Google OAuth uses our own Google Cloud client ID/secret (configured 2026-10-14; secret held only in Neon).
 * **Reason**: Neon requires custom SMTP and own OAuth apps for production; verification links also need custom SMTP.
+
+## ADR 008: One Identity per Email (Implicit Google Linking)
+* **Decision**: Rely on Neon Auth defaults: unique `user.email`, multiple `account` rows per user, Google sign-in links to the existing same-email user. No custom linking code.
+* **Reason**: Verified live (duplicate sign-up creates nothing). Safe only because email/password requires verified email (ADR 006). Live-tested 2026-10-14: verified email + Google links to the same user (credential + google accounts); unverified email + Google is refused with `account_not_linked` (no takeover).
