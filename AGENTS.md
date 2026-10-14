@@ -13,6 +13,7 @@ Never read at start: src/, test/, node_modules, CHANGELOG.md, archive.md. Open t
 ## 2. Read discipline
 - Read by symbol or line range, never whole files unless small. Skip anything under "Do not re-read".
 - No broad searches. Targeted grep only, output capped (`| head -30`). Quiet test/build reporters; show failures only.
+- **First time in a project (or an unfamiliar area): locate, don't browse.** Work out which specific file(s) the task needs (Doc Map in PROJECT_CONTEXT.md, then a targeted grep for the symbol/route/table) and open only those. Treat every read as token spend: if a file isn't needed to complete the task, don't open it. Never skim directories or "get a feel" for the codebase.
 - Load a skill from `.agents/skills/` only when the task matches it, never the whole set.
 - **`FAITHLINK_MVP_ARCHITECTURE_PLAN.md` is 1500+ lines — never read it in full.** To confirm scope for a phase, grep for its exact top-level heading (e.g. `# 11. Phase 5` or `# 12. Phase 6`) to get the start line, then read only that block. Stop reading when you hit the next `# ` top-level heading. Do not read adjacent phases or cross-section content.
 

@@ -1,5 +1,11 @@
 # Changelog — FaithLink Backend
 
+## [2026-10-14] Auth Hardening — Email Verification & Google OAuth
+- Neon Auth (branch `production`): email/password now requires OTP email verification before sign-in (`neon neon-auth config email-password update`).
+- `src/middleware/auth.ts`: `requireAuth` returns 403 when JWT `emailVerified` is not `true` (Zod-validated claim).
+- Google OAuth switched to our own Google client ID/secret on `production` (see DECISIONS ADR 007).
+- Documented frontend auth contract in `FEATURES/auth-and-profile.md`.
+
 ## [2026-10-13] Phase 6 — Results, Progress & Achievements
 - Added `user_achievements` table in Drizzle schema with unique index `(user_id, achievement_key)` and applied migration to Neon PostgreSQL.
 - Implemented `src/services/progress.ts` with:

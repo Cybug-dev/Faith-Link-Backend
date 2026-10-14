@@ -7,8 +7,9 @@ Implemented & Verified
 Establish the foundational multi-tenant data layer and profile schema in PostgreSQL for FaithLink, linking application profiles to Neon Auth identities and setting up Drizzle ORM with connection pooling.
 
 ## User Experience / Behavior
-- Users authenticate via Neon Auth (email/password).
-- Authenticated users access protected endpoints via Bearer JWT.
+- Users authenticate via Neon Auth: Google sign-in, or email/password with mandatory OTP email verification (cannot sign in until verified).
+- Authenticated users access protected endpoints via Bearer JWT; `requireAuth` returns 403 if the JWT `emailVerified` claim is not `true`.
+- Sign-up, sign-in, OTP and Google flows run on Neon-managed Auth (client SDK); the backend only verifies JWTs.
 - Each user has a profile in `public.profiles`.
 - Users belong to churches (`public.churches`) with specific roles (`member`, `leader`, `pastor`, `admin`) via `public.church_members`.
 
@@ -17,6 +18,14 @@ Establish the foundational multi-tenant data layer and profile schema in Postgre
 - **Compute Layer**: Neon Serverless Functions running Node.js 24 with Hono web-standard router.
 - **Data Layer**: Drizzle ORM + `node-postgres` (`pg`) with module-scoped pool attached via `@neon/functions`.
 - **Application Schema**: `public` schema contains `profiles`, `churches`, and `church_members`.
+
+## Frontend Auth Contract (Neon Managed Auth — no custom backend auth endpoints)
+Frontend uses `@neondatabase/auth` (`createAuthClient(NEON_AUTH_BASE_URL)`; env `NEON_AUTH_BASE_URL` from `neon env pull`). Calls return `{ data, error }`.
+- Sign up: `signUp.email({ email, password, name })` → OTP emailed.
+- Verify: `emailOtp.verifyEmail({ email, otp })`; resend: `sendVerificationEmail({ email, callbackURL })`. Codes expire in 15 min.
+- Sign in: `signIn.email({ email, password })` (blocked until verified); Google: `signIn.social({ provider: "google", callbackURL })`.
+- Session / out: `getSession()`, `signOut()`. API token: `token()` → send as `Authorization: Bearer <data.token>` to `/api/*`.
+- Google redirect URI (registered in Google Cloud): `{NEON_AUTH_BASE_URL}/callback/google`. `callbackURL` origins must be in Neon trusted domains.
 
 ## API Endpoints
 - `GET /health`: Health check endpoint returning status and service timestamp.

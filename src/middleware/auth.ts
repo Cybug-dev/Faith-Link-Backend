@@ -1,5 +1,8 @@
 ﻿import { createMiddleware } from "hono/factory";
 import { createRemoteJWKSet, jwtVerify } from "jose";
+import { z } from "zod";
+
+const verifiedClaimSchema = z.object({ emailVerified: z.boolean() });
 
 let jwks: ReturnType<typeof createRemoteJWKSet> | null = null;
 
@@ -47,6 +50,13 @@ export const requireAuth = createMiddleware<AuthContext>(async (c, next) => {
 
     if (!payload.sub) {
       return c.json({ error: "Unauthorized: Missing subject identifier" }, 401);
+    }
+
+    // Defense in depth: Neon blocks unverified sign-in, but a loosened config must not open the API.
+    // Neon's JWT carries camelCase `emailVerified`; a missing/non-boolean claim is treated as unverified.
+    const claims = verifiedClaimSchema.safeParse(payload);
+    if (!claims.success || !claims.data.emailVerified) {
+      return c.json({ error: "Forbidden: Email address is not verified" }, 403);
     }
 
     c.set("userId", payload.sub);

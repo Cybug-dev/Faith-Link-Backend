@@ -1,10 +1,17 @@
 # Working Log — Faith-Link-Backend
 
 ## Current State
-Phases 0–6 live. Idle. Next: Phase 7 Leaderboard (start when instructed; read plan section first per AGENTS §9).
+Auth hardening ⚠️ partly done. Waiting on user: Google client ID/secret, frontend origin(s) for trusted domains. Then Phase 7.
 
 ## Handoff
-- Anchor: none. No interrupted or partial edits.
+- ✅ Neon Auth production (br-soft-butterfly-b482q79w): OTP verification required, sent on sign-up/sign-in, auto sign-in after verify (CLI `neon neon-auth config email-password update`).
+- ✅ `src/middleware/auth.ts:requireAuth` 403s unless JWT `emailVerified === true` (Zod `verifiedClaimSchema`). `tsc --noEmit` clean. Not deployed (`neon deploy` pending).
+- ⚠️ Unverified: `emailVerified` claim name/presence in a real Neon JWT (only seen in docs example). If absent, all users get 403. Check with a real token before deploy.
+- ✅ Google: own client ID/secret set via MCP (type standard). Secret was pasted in chat; never written to files. Redirect URI `{NEON_AUTH_BASE_URL}/callback/google` must be registered in Google Cloud (user to confirm).
+- ⏳ Trusted domains empty, allow_localhost on. Frontend not built/hosted yet; add origin(s) when known; turn off localhost for prod. `list_auth_trusted_domains` 404'd with branch name; use branch id.
+- ✅ Frontend auth contract documented in auth-and-profile.md.
+- ✅ Docs: auth-and-profile.md, DECISIONS (ADR 006-007), CHANGELOG, PROJECT_CONTEXT doc map. AGENTS.md §2 "locate, don't browse" rule added.
+- Do not re-read: managed-auth.md, email-verification docs (done).
 - Last completed: Phase 6 (achievements, streaks, stats endpoints; deployed).
 - Do not re-read: Phases 0–6 areas (live, tested, deployed).
 - Next action: grep `docs/AI/FAITHLINK_MVP_ARCHITECTURE_PLAN.md` for the Phase 7 heading; read that section only.

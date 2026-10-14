@@ -48,7 +48,7 @@ FaithLink is a production-grade, multi-tenant digital engagement platform for ch
 |---|---|
 | `ARCHITECTURE.md` | Request/compute flow; DB schema boundaries; multi-tenancy & concurrency rules |
 | `CHANGELOG.md` | Append-only release history by date (cold) |
-| `DECISIONS.md` | ADR 001–005: stack, auth, schema separation, storage, ORM choices |
+| `DECISIONS.md` | ADR 001–007: stack, auth, schema separation, storage, ORM, email verification, auth providers |
 | `FAITHLINK_MVP_ARCHITECTURE_PLAN.md` | Full product spec §1–36: phases 0–9, stable API map, data relationships, security model, error categories, boundaries (real-time, media, notifications, admin, safety, performance, retention, scope, expansion), DoD, change control |
 | `NEXT_TASKS.md` | Completed phases summary + Phase 6–7 upcoming tasks |
 | `PROJECT_CONTEXT.md` | This file — stable facts, conventions, doc map |

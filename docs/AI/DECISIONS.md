@@ -19,3 +19,11 @@
 ## ADR 005: Drizzle ORM + `node-postgres` (`pg`)
 * **Decision**: Choose Drizzle ORM over Prisma 7.x for database access and migrations.
 * **Reason**: Zero engine overhead, sub-millisecond query compilation, minimal memory (<5MB vs 30-60MB per isolate), native Neon connection pooling via `@neon/functions`, and first-class atomic SQL support for concurrency.
+
+## ADR 006: Mandatory Email Verification (OTP) + Backend Enforcement
+* **Decision**: Email/password sign-in requires OTP email verification (Neon config). `requireAuth` additionally rejects JWTs whose `emailVerified` claim is not `true` (403).
+* **Reason**: OTP works on shared and custom SMTP; backend check is defense in depth if Neon config is loosened. Google sign-ins arrive verified.
+
+## ADR 007: Auth Email & Google OAuth Providers
+* **Decision**: Shared Neon SMTP (`auth@mail.myneon.app`) for now; switch to custom SMTP before production launch. Google OAuth uses our own Google Cloud client ID/secret (configured 2026-10-14; secret held only in Neon).
+* **Reason**: Neon requires custom SMTP and own OAuth apps for production; verification links also need custom SMTP.
