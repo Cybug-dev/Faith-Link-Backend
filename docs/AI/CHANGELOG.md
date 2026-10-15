@@ -87,4 +87,5 @@
 
 ## [2026-10-14]
 - CORS: `origin: "*"` replaced by exact-origin allowlist (`src/config/cors.ts`, `neon.ts` env `CORS_ALLOWED_ORIGINS=http://localhost:5173`). ADR 008.
-- Local dev: `npm run dev` runs `neon dev` on port 8787. Verified preflight allow/block and 401 carrying CORS headers. Not deployed yet.
+- Local dev: `npm run dev` runs `neon dev` on port 8787. Verified preflight allow/block and 401 carrying CORS headers.
+- [2026-10-15] Deployed to production; live preflight allows faithlinkwebapp.vercel.app and localhost:5173, blocks others.

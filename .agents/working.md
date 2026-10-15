@@ -1,7 +1,7 @@
 # Working Log — Faith-Link-Backend
 
 ## Current State
-FE auth wired to Neon Auth ✅ locally. Pending (needs user OK): `neon deploy` (CORS incl. Vercel origin) + Vercel env vars. Then Phase 7.
+Backend deployed 2026-10-15 with CORS allowlist ✅. Pending (needs user OK): Vercel env vars VITE_NEON_AUTH_URL + VITE_API_BASE_URL, redeploy FE. Then Phase 7.
 
 ## Handoff
 - ✅ [2026-10-15] Prod Neon Auth trusted domain `https://faithlinkwebapp.vercel.app` added (verified: origin accepted, others INVALID_ORIGIN). `neon.ts` CORS now Vercel + localhost. FE `auth-client.ts` uses `@neondatabase/auth` (sign up/in, email OTP verify+resend, Google, OTP password reset via `emailOtp.sendVerificationOtp(type forget-password)` + `emailOtp.resetPassword`). SDK throws AuthApiError (not {data,error}); OTP errors = `validation_failed` + message. 55 FE tests, build OK.
