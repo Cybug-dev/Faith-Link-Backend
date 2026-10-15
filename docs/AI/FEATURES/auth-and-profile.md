@@ -35,6 +35,13 @@ Frontend uses `@neondatabase/auth` (`createAuthClient(NEON_AUTH_BASE_URL)`; env 
 - DB guarantees: `neon_auth.user.email` is UNIQUE; sign-in methods are rows in `neon_auth.account` (`credential`, `google`) under one user, so one email = one user = one `profiles` row.
 - Google sign-in on a password-registered email: if that email is verified it links to the same user (tested: one user, `credential`+`google` accounts); if unverified it is refused with `?error=account_not_linked` and nothing is linked. Frontend: show "verify your email first or sign in with your password". Google never uses the password, so passwords can't conflict. A Google-only user adds a password via reset-password.
 
+### Login screen UX guidance (Google-only users have no app password)
+Neon returns the same "invalid credentials" error for an unknown email and for an email with no password, so the backend cannot (and must not) reveal which. Handle it in the frontend:
+1. Remember the last successful method (`google` | `email`) in local storage; show that button first with a "Last used" tag.
+2. On failed email login show: "Wrong email or password. Signed up with Google? Use Continue with Google, or reset your password."
+3. Put "Continue with Google" above the email/password form.
+4. Optional: offer "Add a password" in settings for Google users via the reset-password flow (untested). Never force a password at Google sign-up.
+
 ## API Endpoints
 - `GET /health`: Health check endpoint returning status and service timestamp.
 - `GET /api/me`: Returns authenticated user identity, profile, and church memberships.
@@ -74,6 +81,7 @@ Frontend uses `@neondatabase/auth` (`createAuthClient(NEON_AUTH_BASE_URL)`; env 
 - `DATABASE_URL_UNPOOLED`: Injected direct connection string for migrations.
 - `NEON_AUTH_JWKS_URL`: Injected JWKS URL for JWT verification.
 - `NEON_AUTH_BASE_URL`: Injected base URL for Neon Auth.
+- `CORS_ALLOWED_ORIGINS`: comma-separated exact browser origins, set in `neon.ts` (not a secret). Unset = no cross-origin access. Currently `https://faithlinkwebapp.vercel.app` + `http://localhost:5173`. Same Vercel origin is a Neon Auth trusted domain (production). Password reset is OTP-based (`emailOtp.sendVerificationOtp` type `forget-password`, then `emailOtp.resetPassword`).
 
 ## Files / Modules
 - `src/db/schema.ts`: Drizzle schema definition.

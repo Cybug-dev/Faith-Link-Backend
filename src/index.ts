@@ -5,15 +5,18 @@ import { profileRouter } from "./routes/profile.js";
 import { churchRouter } from "./routes/church.js";
 import { lessonRouter } from "./routes/lesson.js";
 import { quizRouter } from "./routes/quiz.js";
+import { parseAllowedOrigins } from "./config/cors.js";
 
 const app = new Hono();
+const allowedOrigins = parseAllowedOrigins(process.env.CORS_ALLOWED_ORIGINS);
 
 // Global middleware
 app.use("*", logger());
 app.use(
   "*",
   cors({
-    origin: "*",
+    // Echo the origin only when allowlisted; otherwise no CORS headers, so the browser blocks it.
+    origin: (origin) => (allowedOrigins.has(origin) ? origin : null),
     allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],
     maxAge: 86400,

@@ -39,6 +39,7 @@ FaithLink is a production-grade, multi-tenant digital engagement platform for ch
 - Soft-delete via `deletedAt` on `quizzes` and `quiz_questions`
 - Test runner: `npx tsx test/<name>.test.ts`
 - Deploy: `neon deploy` (targets `production` branch automatically)
+- Local dev: `npm run dev` (`neon dev`, API on :8787). CORS allowlist: `neon.ts` → `functions.api.env.CORS_ALLOWED_ORIGINS`, parsed by `src/config/cors.ts`
 
 ## Doc Map
 > Read a file only when the current task needs it. Do not read in full; use headings or line ranges.

@@ -31,3 +31,7 @@
 ## ADR 008: One Identity per Email (Implicit Google Linking)
 * **Decision**: Rely on Neon Auth defaults: unique `user.email`, multiple `account` rows per user, Google sign-in links to the existing same-email user. No custom linking code.
 * **Reason**: Verified live (duplicate sign-up creates nothing). Safe only because email/password requires verified email (ADR 006). Live-tested 2026-10-14: verified email + Google links to the same user (credential + google accounts); unverified email + Google is refused with `account_not_linked` (no takeover).
+
+## ADR 008: Env-Driven CORS Allowlist in `neon.ts`
+* **Decision**: Replace `origin: "*"` with an exact-origin allowlist (`CORS_ALLOWED_ORIGINS`, declared in `neon.ts` function `env`, parsed in `src/config/cors.ts`, fails closed). No credentials mode: the API uses Bearer tokens, not cookies. Local API on fixed port 8787 (`dev.port`), frontend pinned to 5173 (`strictPort`).
+* **Reason**: `neon dev` injects only Neon-managed vars plus `neon.ts` env (not `.env.local`), and function env is static across branches, so `neon.ts` is the one place that drives both local and deployed CORS. Add the hosted frontend origin there and drop localhost before launch.

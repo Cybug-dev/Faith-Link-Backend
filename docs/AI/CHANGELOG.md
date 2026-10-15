@@ -84,3 +84,7 @@
 - Deployed updated serverless function to Neon Cloud and verified live endpoints.
 
 
+
+## [2026-10-14]
+- CORS: `origin: "*"` replaced by exact-origin allowlist (`src/config/cors.ts`, `neon.ts` env `CORS_ALLOWED_ORIGINS=http://localhost:5173`). ADR 008.
+- Local dev: `npm run dev` runs `neon dev` on port 8787. Verified preflight allow/block and 401 carrying CORS headers. Not deployed yet.
