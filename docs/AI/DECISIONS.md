@@ -35,3 +35,7 @@
 ## ADR 008: Env-Driven CORS Allowlist in `neon.ts`
 * **Decision**: Replace `origin: "*"` with an exact-origin allowlist (`CORS_ALLOWED_ORIGINS`, declared in `neon.ts` function `env`, parsed in `src/config/cors.ts`, fails closed). No credentials mode: the API uses Bearer tokens, not cookies. Local API on fixed port 8787 (`dev.port`), frontend pinned to 5173 (`strictPort`).
 * **Reason**: `neon dev` injects only Neon-managed vars plus `neon.ts` env (not `.env.local`), and function env is static across branches, so `neon.ts` is the one place that drives both local and deployed CORS. Add the hosted frontend origin there and drop localhost before launch.
+
+## ADR 008: Password reset completes through the backend
+* **Decision**: The final reset call (email + code + new password) goes through `POST /api/auth/password-reset`, which calls Neon Auth and then sends a "password changed" email via Resend. Resend is called over REST (no SDK). Neon's own sender still delivers sign-up and reset codes until a domain is verified.
+* **Reason**: Neon Auth has no webhook/event for a finished reset; the Resend sandbox sender only reaches the account owner, so it can't replace Neon's sender yet.

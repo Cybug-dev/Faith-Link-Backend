@@ -5,6 +5,7 @@ import { profileRouter } from "./routes/profile.js";
 import { churchRouter } from "./routes/church.js";
 import { lessonRouter } from "./routes/lesson.js";
 import { quizRouter } from "./routes/quiz.js";
+import { authRouter } from "./routes/auth.js";
 import { parseAllowedOrigins } from "./config/cors.js";
 
 const app = new Hono();
@@ -37,6 +38,7 @@ app.get("/", (c) => {
 });
 
 // Mount domain routes
+app.route("/api/auth", authRouter);
 app.route("/api", profileRouter);
 app.route("/api/churches", churchRouter);
 app.route("/api/churches", lessonRouter);
