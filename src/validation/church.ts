@@ -1,4 +1,5 @@
 ﻿import { z } from "zod";
+import { CHURCH_ROLES } from "../services/church-permissions.js";
 
 export const createChurchSchema = z.object({
   name: z
@@ -27,4 +28,54 @@ export const churchIdParamSchema = z.object({
   id: z.string({ message: "Church ID must be a string" }).uuid("Invalid church ID format (must be a valid UUID)"),
 });
 
+const roleLabel = z
+  .string({ message: "Role label must be a string" })
+  .trim()
+  .min(1, "Role label cannot be empty")
+  .max(40, "Role label must be at most 40 characters");
+
+/** Display-only renames; unknown role keys are rejected. The map replaces the stored one in full. */
+export const roleLabelsSchema = z
+  .object({
+    admin: roleLabel.optional(),
+    pastor: roleLabel.optional(),
+    leader: roleLabel.optional(),
+    member: roleLabel.optional(),
+  })
+  .strict();
+
+/** Slug is deliberately not editable: it is the church's stable public identifier. */
+export const updateChurchSchema = createChurchSchema
+  .omit({ slug: true })
+  .partial()
+  .extend({ roleLabels: roleLabelsSchema.optional() })
+  .strict()
+  .refine((v) => Object.keys(v).length > 0, { message: "Provide at least one field to update" });
+
+export const paginationQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+  offset: z.coerce.number().int().min(0).max(10_000).default(0),
+});
+
+export const listChurchesQuerySchema = paginationQuerySchema.extend({
+  q: z.string().trim().max(100, "Search must be at most 100 characters").optional(),
+});
+
+export const membershipIdParamSchema = z.object({
+  membershipId: z.string().uuid("Invalid membership ID format (must be a valid UUID)"),
+});
+
+export const updateMemberRoleSchema = z
+  .object({
+    role: z.enum(CHURCH_ROLES, { message: `Role must be one of: ${CHURCH_ROLES.join(", ")}` }),
+  })
+  .strict();
+
+export const primaryTransferSchema = z
+  .object({
+    membershipId: z.string().uuid("Invalid membership ID format (must be a valid UUID)"),
+  })
+  .strict();
+
 export type CreateChurchInput = z.infer<typeof createChurchSchema>;
+export type UpdateChurchInput = z.infer<typeof updateChurchSchema>;

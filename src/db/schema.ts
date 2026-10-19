@@ -6,9 +6,12 @@ import {
   uuid,
   integer,
   boolean,
+  jsonb,
   uniqueIndex,
   index,
+  check,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 /**
  * User Profiles in public schema.
@@ -39,6 +42,8 @@ export const churches = pgTable(
     address: text("address"),
     city: varchar("city", { length: 100 }),
     country: varchar("country", { length: 100 }),
+    /** Display-only overrides keyed by system role, e.g. { "leader": "Deacon" }. Never affects permissions. */
+    roleLabels: jsonb("role_labels").$type<Partial<Record<string, string>>>().notNull().default({}),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
@@ -64,11 +69,56 @@ export const churchMembers = pgTable(
     role: varchar("role", { length: 50 }).notNull().default("member"),
     status: varchar("status", { length: 50 }).notNull().default("active"),
     joinedAt: timestamp("joined_at", { withTimezone: true }).defaultNow().notNull(),
+    /**
+     * The one protected admin per church: cannot be demoted, removed, or leave
+     * until the flag is handed over through a primary transfer.
+     */
+    isPrimaryAdmin: boolean("is_primary_admin").notNull().default(false),
   },
   (table) => [
     uniqueIndex("church_members_church_user_idx").on(table.churchId, table.userId),
     index("church_members_user_idx").on(table.userId),
     index("church_members_church_idx").on(table.churchId),
+    uniqueIndex("church_members_one_primary_idx")
+      .on(table.churchId)
+      .where(sql`${table.isPrimaryAdmin}`),
+    check("church_members_role_valid", sql`${table.role} IN ('admin', 'pastor', 'leader', 'member')`),
+    check("church_members_status_valid", sql`${table.status} IN ('active', 'left', 'removed')`),
+    check(
+      "church_members_primary_is_admin",
+      sql`NOT ${table.isPrimaryAdmin} OR (${table.role} = 'admin' AND ${table.status} = 'active')`
+    ),
+  ]
+);
+
+/**
+ * Primary-admin transfer offers. Two-step: the primary admin offers, the target accepts.
+ * At most one pending offer per church (partial unique index).
+ */
+export const churchPrimaryTransfers = pgTable(
+  "church_primary_transfers",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    churchId: uuid("church_id")
+      .notNull()
+      .references(() => churches.id, { onDelete: "cascade" }),
+    fromUserId: text("from_user_id")
+      .notNull()
+      .references(() => profiles.userId, { onDelete: "cascade" }),
+    toUserId: text("to_user_id")
+      .notNull()
+      .references(() => profiles.userId, { onDelete: "cascade" }),
+    /** pending | accepted | cancelled | expired */
+    status: varchar("status", { length: 20 }).notNull().default("pending"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex("church_primary_transfers_one_pending_idx")
+      .on(table.churchId)
+      .where(sql`${table.status} = 'pending'`),
+    index("church_primary_transfers_to_user_idx").on(table.toUserId),
   ]
 );
 
@@ -134,6 +184,7 @@ export type Church = typeof churches.$inferSelect;
 export type NewChurch = typeof churches.$inferInsert;
 export type ChurchMember = typeof churchMembers.$inferSelect;
 export type NewChurchMember = typeof churchMembers.$inferInsert;
+export type ChurchPrimaryTransfer = typeof churchPrimaryTransfers.$inferSelect;
 export type Lesson = typeof lessons.$inferSelect;
 export type NewLesson = typeof lessons.$inferInsert;
 export type LessonCompletion = typeof lessonCompletions.$inferSelect;

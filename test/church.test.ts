@@ -114,7 +114,52 @@ async function runTests() {
     console.log("✓ requireTenantRole rejects non-members with 403 Forbidden");
   }
 
-  console.log("\nAll 9 unit and router integration checks passed successfully!");
+  // 10. New membership routes reject unauthenticated requests
+  {
+    const id = "00000000-0000-0000-0000-000000000000";
+    const mid = "11111111-1111-1111-1111-111111111111";
+    const cases: [string, string][] = [
+      ["PATCH", `/api/churches/${id}`],
+      ["POST", `/api/churches/${id}/leave`],
+      ["PATCH", `/api/churches/${id}/members/${mid}/role`],
+      ["DELETE", `/api/churches/${id}/members/${mid}`],
+      ["POST", `/api/churches/${id}/primary-transfer`],
+      ["POST", `/api/churches/${id}/primary-transfer/accept`],
+      ["POST", `/api/churches/${id}/primary-transfer/cancel`],
+    ];
+    for (const [method, path] of cases) {
+      const res = await app.request(path, { method });
+      assert.equal(res.status, 401, `${method} ${path} should require auth`);
+    }
+    console.log("✓ Membership management routes reject unauthenticated requests (401)");
+  }
+
+  // 11. Membership validation schemas
+  {
+    const { updateChurchSchema, updateMemberRoleSchema, listChurchesQuerySchema } = await import(
+      "../src/validation/church.js"
+    );
+
+    assert.equal(updateChurchSchema.safeParse({}).success, false);
+    assert.equal(updateChurchSchema.safeParse({ slug: "new-slug" }).success, false);
+    assert.equal(updateChurchSchema.safeParse({ roleLabels: { owner: "Boss" } }).success, false);
+    assert.equal(updateChurchSchema.safeParse({ roleLabels: { leader: "   " } }).success, false);
+    assert.equal(updateChurchSchema.safeParse({ roleLabels: { leader: "Deacon" } }).success, true);
+    console.log("✓ Church update rejects empty/slug/unknown-role/blank-label payloads, accepts labels");
+
+    assert.equal(updateMemberRoleSchema.safeParse({ role: "owner" }).success, false);
+    assert.equal(updateMemberRoleSchema.safeParse({ role: "admin", isPrimaryAdmin: true }).success, false);
+    assert.equal(updateMemberRoleSchema.safeParse({ role: "leader" }).success, true);
+    console.log("✓ Role payload accepts only a known role and nothing else (no primary flag smuggling)");
+
+    assert.equal(listChurchesQuerySchema.safeParse({ limit: "500" }).success, false);
+    const defaults = listChurchesQuerySchema.parse({});
+    assert.equal(defaults.limit, 20);
+    assert.equal(defaults.offset, 0);
+    console.log("✓ Directory query caps limit at 50 and defaults paging");
+  }
+
+  console.log("\nAll 11 unit and router integration checks passed successfully!");
 }
 
 runTests().catch((err) => {

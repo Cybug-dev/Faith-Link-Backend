@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db } from "../db/index.js";
 import { churchMembers, type ChurchMember } from "../db/schema.js";
 import type { AuthContext } from "./auth.js";
+import { CHURCH_PERMISSIONS, type ChurchPermission } from "../services/church-permissions.js";
 
 const uuidSchema = z.string().uuid();
 
@@ -73,4 +74,9 @@ export function requireTenantRole(allowedRoles: string[]) {
 
     await next();
   });
+}
+
+/** Tenant guard by named action, so routes never hardcode role lists. */
+export function requireChurchPermission(permission: ChurchPermission) {
+  return requireTenantRole([...CHURCH_PERMISSIONS[permission]]);
 }

@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { requireAuth } from "../middleware/auth.js";
-import { requireTenantRole, type TenantContext } from "../middleware/tenant.js";
+import { requireTenantRole, requireChurchPermission, type TenantContext } from "../middleware/tenant.js";
+import { hasPermission } from "../services/church-permissions.js";
 import {
   createQuizSchema,
   updateQuizSchema,
@@ -24,7 +25,6 @@ import {
 export const quizRouter = new Hono<TenantContext>();
 
 const ALL_MEMBER_ROLES = ["admin", "pastor", "leader", "member"] as const;
-const LEADER_ROLES = ["admin", "pastor", "leader"] as const;
 
 /**
  * GET /api/churches/:id/quizzes
@@ -35,10 +35,10 @@ const LEADER_ROLES = ["admin", "pastor", "leader"] as const;
 quizRouter.get("/:id/quizzes", requireAuth, requireTenantRole([...ALL_MEMBER_ROLES]), async (c) => {
   const churchId = c.get("churchId");
   const memberRole = c.get("memberRole");
-  const isLeader = LEADER_ROLES.includes(memberRole as typeof LEADER_ROLES[number]);
+  const canManage = hasPermission(memberRole, "quizzes.manage");
 
   try {
-    const quizList = await listQuizzes(churchId, isLeader);
+    const quizList = await listQuizzes(churchId, canManage);
     return c.json({ churchId, total: quizList.length, quizzes: quizList });
   } catch (err) {
     console.error("Error listing quizzes:", err);
@@ -63,13 +63,13 @@ quizRouter.get("/:id/quizzes/:quizId", requireAuth, requireTenantRole([...ALL_ME
   }
 
   try {
-    const isLeader = LEADER_ROLES.includes(memberRole as typeof LEADER_ROLES[number]);
-    const quiz = await getQuiz(quizId, churchId, !isLeader);
+    const canManage = hasPermission(memberRole, "quizzes.manage");
+    const quiz = await getQuiz(quizId, churchId, !canManage);
     if (!quiz) {
       return c.json({ error: "Not Found: Quiz not found in this church" }, 404);
     }
 
-    if (!isLeader && quiz.status !== "published") {
+    if (!canManage && quiz.status !== "published") {
       // Return 404 (not 403) to avoid leaking draft existence to members
       return c.json({ error: "Not Found: Quiz not found in this church" }, 404);
     }
@@ -84,9 +84,9 @@ quizRouter.get("/:id/quizzes/:quizId", requireAuth, requireTenantRole([...ALL_ME
 /**
  * POST /api/churches/:id/quizzes
  * Creates a new quiz with its questions and options in one request.
- * Guarded by requireTenantRole(['admin', 'pastor', 'leader']).
+ * Guarded by requireChurchPermission('quizzes.manage').
  */
-quizRouter.post("/:id/quizzes", requireAuth, requireTenantRole([...LEADER_ROLES]), async (c) => {
+quizRouter.post("/:id/quizzes", requireAuth, requireChurchPermission("quizzes.manage"), async (c) => {
   const churchId = c.get("churchId");
   const userId = c.get("userId");
 
@@ -119,9 +119,9 @@ quizRouter.post("/:id/quizzes", requireAuth, requireTenantRole([...LEADER_ROLES]
  * PUT /api/churches/:id/quizzes/:quizId
  * Updates quiz metadata and optionally replaces its question set.
  * When questions are supplied, the full-replace strategy applies (see quiz service).
- * Guarded by requireTenantRole(['admin', 'pastor', 'leader']).
+ * Guarded by requireChurchPermission('quizzes.manage').
  */
-quizRouter.put("/:id/quizzes/:quizId", requireAuth, requireTenantRole([...LEADER_ROLES]), async (c) => {
+quizRouter.put("/:id/quizzes/:quizId", requireAuth, requireChurchPermission("quizzes.manage"), async (c) => {
   const churchId = c.get("churchId");
   const quizId = c.req.param("quizId");
 
@@ -164,9 +164,9 @@ quizRouter.put("/:id/quizzes/:quizId", requireAuth, requireTenantRole([...LEADER
  * DELETE /api/churches/:id/quizzes/:quizId
  * Soft-deletes a quiz (sets deletedAt). Questions and options are preserved
  * for Phase 6 historical attempt lookups.
- * Guarded by requireTenantRole(['admin', 'pastor', 'leader']).
+ * Guarded by requireChurchPermission('quizzes.manage').
  */
-quizRouter.delete("/:id/quizzes/:quizId", requireAuth, requireTenantRole([...LEADER_ROLES]), async (c) => {
+quizRouter.delete("/:id/quizzes/:quizId", requireAuth, requireChurchPermission("quizzes.manage"), async (c) => {
   const churchId = c.get("churchId");
   const quizId = c.req.param("quizId");
 
@@ -205,10 +205,10 @@ quizRouter.post("/:id/quizzes/:quizId/attempts", requireAuth, requireTenantRole(
     return c.json({ error: `Bad Request: ${paramValidation.error.issues[0]?.message}` }, 400);
   }
 
-  const isLeader = LEADER_ROLES.includes(memberRole as typeof LEADER_ROLES[number]);
+  const canManage = hasPermission(memberRole, "quizzes.manage");
 
   try {
-    const result = await startQuizAttempt(churchId, quizId, userId, isLeader);
+    const result = await startQuizAttempt(churchId, quizId, userId, canManage);
     return c.json(
       {
         message: "Quiz attempt started successfully",
@@ -245,10 +245,10 @@ quizRouter.get("/:id/attempts/:attemptId", requireAuth, requireTenantRole([...AL
     return c.json({ error: `Bad Request: ${paramValidation.error.issues[0]?.message}` }, 400);
   }
 
-  const isLeader = LEADER_ROLES.includes(memberRole as typeof LEADER_ROLES[number]);
+  const canManage = hasPermission(memberRole, "quizzes.manage");
 
   try {
-    const attempt = await getQuizAttempt(attemptId, churchId, userId, isLeader);
+    const attempt = await getQuizAttempt(attemptId, churchId, userId, canManage);
     if (!attempt) {
       return c.json({ error: "Not Found: Quiz attempt not found" }, 404);
     }
@@ -347,7 +347,7 @@ quizRouter.post("/:id/attempts/:attemptId/complete", requireAuth, requireTenantR
  * GET /api/churches/:id/quizzes/:quizId/attempts
  * Lists all attempts for a quiz. Guarded by leader role.
  */
-quizRouter.get("/:id/quizzes/:quizId/attempts", requireAuth, requireTenantRole([...LEADER_ROLES]), async (c) => {
+quizRouter.get("/:id/quizzes/:quizId/attempts", requireAuth, requireChurchPermission("quizzes.manage"), async (c) => {
   const churchId = c.get("churchId");
   const quizId = c.req.param("quizId");
 

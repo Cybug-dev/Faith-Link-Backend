@@ -89,3 +89,11 @@
 - CORS: `origin: "*"` replaced by exact-origin allowlist (`src/config/cors.ts`, `neon.ts` env `CORS_ALLOWED_ORIGINS=http://localhost:5173`). ADR 008.
 - Local dev: `npm run dev` runs `neon dev` on port 8787. Verified preflight allow/block and 401 carrying CORS headers.
 - [2026-10-15] Deployed to production; live preflight allows faithlinkwebapp.vercel.app and localhost:5173, blocks others.
+
+## [2026-10-19] Membership hierarchy & church authorization
+- Schema: `church_members.is_primary_admin` (+ one-per-church index, role/status/primary CHECKs), `churches.role_labels`, new `church_primary_transfers`. Migration `drizzle/0002_membership_hierarchy.sql` (hand-written; drizzle journal is behind the live DB).
+- New `src/services/church-permissions.ts`, `src/services/membership.ts`; `requireChurchPermission` in `src/middleware/tenant.ts`.
+- New routes: `GET /api/churches`, `PATCH /api/churches/:id`, member role change, member removal, leave, primary transfer offer/accept/cancel. `/join` reactivates users who left. Members list paginated. `/api/me` returns active memberships with `isPrimaryAdmin`.
+- Lessons now admin + pastor only. CORS allows PATCH.
+- Fixed: unique-violation detection (Drizzle wraps pg errors in `cause`), so duplicate slug/transfer/join return 409, not 500.
+- Verified on temp branch: all suites, DB constraint checks, 13-step end-to-end service run. Not yet applied to production or deployed.

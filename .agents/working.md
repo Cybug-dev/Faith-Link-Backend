@@ -1,9 +1,11 @@
 # Working Log — Faith-Link-Backend
 
 ## Current State
-Backend deployed 2026-10-15 with CORS allowlist ✅. Pending (needs user OK): Vercel env vars VITE_NEON_AUTH_URL + VITE_API_BASE_URL, redeploy FE. Then Phase 7.
+✅ Membership hierarchy built + verified on temp branch. Next: user OK to apply migration to production (pending Neon migration id e8e84bb7-cb24-4665-8b59-3085010708e1, temp branch br-weathered-voice-b4n16spe) + `neon deploy`; then frontend wiring. Older pending: Vercel env vars + FE redeploy (needs user OK).
 
 ## Handoff
+- ✅ [2026-10-19] Verified: tsc clean; all 7 suites pass on temp branch; DB constraint + backfill checks; 13-step e2e service run (scratch script, not in repo). Fixed during verification: Drizzle wraps pg errors (`membership.ts:isUniqueViolation`), directory memberCount subquery bound to wrong `id`. Placed permissions in `src/services/church-permissions.ts` (plan said `src/auth/`). Do not re-read: church-permissions.ts, membership.ts, church.ts (verified).
+- (done) [2026-10-19] Membership hardening. Files: `src/db/schema.ts`, `drizzle/0002_membership_hierarchy.sql`, `src/auth/church-permissions.ts` (new), `src/middleware/tenant.ts:requireChurchPermission`, `src/services/membership.ts` (new), `src/routes/church.ts`, `src/validation/church.ts`, `src/routes/lesson.ts|quiz.ts` (named permissions), `src/routes/profile.ts` (isPrimaryAdmin), `src/index.ts` (CORS PATCH), tests. Change: primary-admin flag, role labels, role/remove/leave/rejoin, directory, PATCH church, primary transfer. Prod migration + deploy need user OK.
 - ✅ [2026-10-16] POST /api/auth/password-reset (`src/routes/auth.ts`): Zod body + password rule (`src/validation/auth.ts`), proxies Neon Auth `/email-otp/reset-password` with a trusted Origin, maps errors to FE codes, then best-effort Resend email (`src/services/email.ts`, REST, no SDK). `neon.ts` env RESEND_API_KEY/RESEND_FROM read from the deploy shell. Verified: tsc clean, `test/auth.test.ts` 4/4 (fetch mocked). Not deployed: run `neon deploy` with RESEND_API_KEY exported (needs user OK). Sandbox sender delivers only to the Resend account owner.
 - ✅ [2026-10-15] Prod Neon Auth trusted domain `https://faithlinkwebapp.vercel.app` added (verified: origin accepted, others INVALID_ORIGIN). `neon.ts` CORS now Vercel + localhost. FE `auth-client.ts` uses `@neondatabase/auth` (sign up/in, email OTP verify+resend, Google, OTP password reset via `emailOtp.sendVerificationOtp(type forget-password)` + `emailOtp.resetPassword`). SDK throws AuthApiError (not {data,error}); OTP errors = `validation_failed` + message. 55 FE tests, build OK.
 - ✅ [2026-10-14] FE↔BE local wiring: CORS allowlist `src/config/cors.ts:parseAllowedOrigins` + `src/index.ts` cors origin fn; value in `neon.ts` functions.api.env (`neon dev` ignores `.env.local` custom vars) + `dev.port` 8787; `npm run dev` = `neon dev`. FE: Vite strictPort 5173, `.env.example`, `.env.local` (VITE_API_BASE_URL, VITE_NEON_AUTH_URL). Verified: tsc clean; curl preflight from 5173 → allow-origin, other origin → none; 401 carries allow-origin; parser edge cases throw. `neon deploy` not run (prod still `*` until deployed).
@@ -48,3 +50,7 @@ Backend deployed 2026-10-15 with CORS allowlist ✅. Pending (needs user OK): Ve
 | Streak date gaps | Wrong streak count | Handled (diff over distinct activity dates) |
 | User with zero activity | Null / divide-by-zero | Handled (safe defaults) |
 | Duplicate working.md at project root | Stale-log risk | Handled (merged here, root copy removed) |
+| Church with no active admin at backfill | No primary admin for that church | Unhandled (impossible today: creation always adds an admin; prod had 0 churches) |
+| Primary admin loses account access | Church unmanageable for transfers | Manual support action (LIMITATION, ADR 013) |
+| Removed user wants back in | Cannot self-rejoin; no invite flow yet | Needs future invite/approval flow |
+| Leaders lose lesson authoring | Behavior change for existing leader accounts | Handled (ADR 011, user role split) |

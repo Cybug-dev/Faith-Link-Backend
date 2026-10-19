@@ -1,13 +1,42 @@
-﻿import { Hono } from "hono";
-import { eq, and, sql } from "drizzle-orm";
+﻿import { Hono, type Context } from "hono";
+import { eq, and } from "drizzle-orm";
 import { createRemoteJWKSet, jwtVerify } from "jose";
+import type { z } from "zod";
 import { db } from "../db/index.js";
-import { churches, churchMembers, profiles } from "../db/schema.js";
+import { churches, churchMembers } from "../db/schema.js";
 import { requireAuth, type AuthContext } from "../middleware/auth.js";
-import { requireTenantRole, type TenantContext } from "../middleware/tenant.js";
-import { createChurchSchema, churchIdParamSchema } from "../validation/church.js";
+import { requireChurchPermission, requireTenantRole } from "../middleware/tenant.js";
+import {
+  createChurchSchema,
+  churchIdParamSchema,
+  updateChurchSchema,
+  listChurchesQuerySchema,
+  paginationQuerySchema,
+  membershipIdParamSchema,
+  updateMemberRoleSchema,
+  primaryTransferSchema,
+} from "../validation/church.js";
+import { CHURCH_ROLES, permissionsFor } from "../services/church-permissions.js";
+import {
+  acceptPrimaryTransfer,
+  cancelPrimaryTransfer,
+  changeMemberRole,
+  createChurch,
+  defaultDisplayName,
+  getPendingTransferFor,
+  joinChurch,
+  leaveChurch,
+  listChurches,
+  listMembers,
+  offerPrimaryTransfer,
+  removeMember,
+  updateChurch,
+  type ServiceError,
+} from "../services/membership.js";
 
 export const churchRouter = new Hono<AuthContext>();
+
+const ALL_MEMBER_ROLES = [...CHURCH_ROLES];
 
 let cachedJWKS: ReturnType<typeof createRemoteJWKSet> | null = null;
 function getJWKS() {
@@ -41,116 +70,64 @@ async function resolveOptionalUserId(authHeader?: string | null): Promise<string
   }
 }
 
+const STATUS_PREFIX: Record<ServiceError["status"], string> = {
+  400: "Bad Request",
+  403: "Forbidden",
+  404: "Not Found",
+  409: "Conflict",
+};
+
+function serviceError(c: Context, e: ServiceError) {
+  return c.json({ error: `${STATUS_PREFIX[e.status]}: ${e.message}`, code: e.code }, e.status);
+}
+
+function validationError(c: Context, what: string, error: z.ZodError) {
+  return c.json(
+    {
+      error: `Validation Error: Invalid ${what}`,
+      details: error.issues.map((i) => ({ path: i.path.join("."), message: i.message })),
+    },
+    400
+  );
+}
+
+async function readJsonBody(c: Context): Promise<unknown> {
+  return c.req.json().catch(() => null);
+}
+
+/**
+ * GET /api/churches
+ * Public church directory. Optional `q` (name/city search), `limit` (≤50), `offset`.
+ */
+churchRouter.get("/", async (c) => {
+  const query = listChurchesQuerySchema.safeParse(c.req.query());
+  if (!query.success) return validationError(c, "query parameters", query.error);
+  return c.json(await listChurches(query.data));
+});
+
 /**
  * POST /api/churches
- * Creates a new church and assigns the authenticated creator as admin (atomic transaction).
+ * Creates a church; the creator becomes admin + primary admin (atomic). Limited per user.
  */
 churchRouter.post("/", requireAuth, async (c) => {
-  const userId = c.get("userId");
-  const rawBody = await c.req.json().catch(() => null);
-
+  const rawBody = await readJsonBody(c);
   if (!rawBody || typeof rawBody !== "object") {
     return c.json({ error: "Bad Request: Invalid JSON request body" }, 400);
   }
 
   const validation = createChurchSchema.safeParse(rawBody);
-  if (!validation.success) {
-    return c.json(
-      {
-        error: "Validation Error: Invalid church payload",
-        details: validation.error.issues.map((i) => ({ path: i.path.join("."), message: i.message })),
-      },
-      400
-    );
-  }
+  if (!validation.success) return validationError(c, "church payload", validation.error);
 
-  const { name, slug, description, logoUrl, address, city, country } = validation.data;
+  const result = await createChurch(c.get("userId"), defaultDisplayName(c.get("jwtPayload")), validation.data);
+  if (!result.ok) return serviceError(c, result);
 
-  // Check slug availability prior to transaction
-  const [existingSlug] = await db
-    .select({ id: churches.id })
-    .from(churches)
-    .where(eq(churches.slug, slug))
-    .limit(1);
-
-  if (existingSlug) {
-    return c.json({ error: "Conflict: A church with this slug already exists" }, 409);
-  }
-
-  const now = new Date();
-  const jwtPayload = c.get("jwtPayload");
-  const defaultDisplayName =
-    (jwtPayload?.name as string) ||
-    ((jwtPayload?.email as string)?.split("@")[0] ?? "User");
-
-  try {
-    const result = await db.transaction(async (tx) => {
-      // 1. Ensure creator profile exists to satisfy foreign key constraint
-      await tx
-        .insert(profiles)
-        .values({
-          userId,
-          displayName: defaultDisplayName,
-          createdAt: now,
-          updatedAt: now,
-        })
-        .onConflictDoNothing();
-
-      // 2. Create the church
-      const [newChurch] = await tx
-        .insert(churches)
-        .values({
-          name,
-          slug,
-          description: description || null,
-          logoUrl: logoUrl || null,
-          address: address || null,
-          city: city || null,
-          country: country || null,
-          createdAt: now,
-          updatedAt: now,
-        })
-        .returning();
-
-      // 3. Establish creator as admin member
-      const [adminMembership] = await tx
-        .insert(churchMembers)
-        .values({
-          churchId: newChurch.id,
-          userId,
-          role: "admin",
-          status: "active",
-          joinedAt: now,
-        })
-        .returning();
-
-      return {
-        church: newChurch,
-        membership: adminMembership,
-      };
-    });
-
-    return c.json(
-      {
-        message: "Church created successfully",
-        church: result.church,
-        membership: result.membership,
-      },
-      201
-    );
-  } catch (err: unknown) {
-    const pgError = err as { code?: string };
-    if (pgError.code === "23505") {
-      return c.json({ error: "Conflict: A church with this slug already exists" }, 409);
-    }
-    console.error("Failed to create church:", err);
-    return c.json({ error: "Internal Server Error: Could not create church" }, 500);
-  }
+  return c.json({ message: "Church created successfully", ...result.data }, 201);
 });
 
 /**
  * GET /api/churches/:id
- * Fetches church information, distinguishing public-safe view from member view.
+ * Public-safe view for visitors; full view for members, plus the viewer's role,
+ * permissions, and any pending primary transfer involving them.
  */
 churchRouter.get("/:id", async (c) => {
   const paramValidation = churchIdParamSchema.safeParse({ id: c.req.param("id") });
@@ -160,25 +137,19 @@ churchRouter.get("/:id", async (c) => {
 
   const churchId = paramValidation.data.id;
 
-  const [church] = await db
-    .select()
-    .from(churches)
-    .where(eq(churches.id, churchId))
-    .limit(1);
+  const [church] = await db.select().from(churches).where(eq(churches.id, churchId)).limit(1);
 
   if (!church) {
     return c.json({ error: "Not Found: Church not found" }, 404);
   }
 
-  // Check if caller is authenticated and a member
   const optionalUserId = await resolveOptionalUserId(c.req.header("authorization"));
-  let memberDetails: { isMember: boolean; role?: string; joinedAt?: Date } = { isMember: false };
 
   if (optionalUserId) {
     const [membership] = await db
       .select({
         role: churchMembers.role,
-        status: churchMembers.status,
+        isPrimaryAdmin: churchMembers.isPrimaryAdmin,
         joinedAt: churchMembers.joinedAt,
       })
       .from(churchMembers)
@@ -192,23 +163,20 @@ churchRouter.get("/:id", async (c) => {
       .limit(1);
 
     if (membership) {
-      memberDetails = {
-        isMember: true,
-        role: membership.role,
-        joinedAt: membership.joinedAt,
-      };
+      return c.json({
+        church,
+        viewer: {
+          isMember: true,
+          role: membership.role,
+          isPrimaryAdmin: membership.isPrimaryAdmin,
+          joinedAt: membership.joinedAt,
+          permissions: permissionsFor(membership.role, membership.isPrimaryAdmin),
+          pendingPrimaryTransfer: await getPendingTransferFor(churchId, optionalUserId),
+        },
+      });
     }
   }
 
-  // If member, return full details including address and member context
-  if (memberDetails.isMember) {
-    return c.json({
-      church,
-      viewer: memberDetails,
-    });
-  }
-
-  // Public-safe view for non-members / unauthenticated visitors
   return c.json({
     church: {
       id: church.id,
@@ -218,6 +186,7 @@ churchRouter.get("/:id", async (c) => {
       logoUrl: church.logoUrl,
       city: church.city,
       country: church.country,
+      roleLabels: church.roleLabels,
       createdAt: church.createdAt,
     },
     viewer: {
@@ -227,139 +196,153 @@ churchRouter.get("/:id", async (c) => {
 });
 
 /**
+ * PATCH /api/churches/:id
+ * Edits church profile fields and display-only role labels. Admins only. Slug is not editable.
+ */
+churchRouter.patch("/:id", requireAuth, requireChurchPermission("church.update"), async (c) => {
+  const rawBody = await readJsonBody(c);
+  const validation = updateChurchSchema.safeParse(rawBody);
+  if (!validation.success) return validationError(c, "church update", validation.error);
+
+  const church = await updateChurch(c.req.param("id"), validation.data);
+  return c.json({ church });
+});
+
+/**
  * POST /api/churches/:id/join
- * Joins an existing church as a standard member (role cannot be client-specified).
+ * Joins as `member` (role is never client-specified). A user who left is reactivated.
  */
 churchRouter.post("/:id/join", requireAuth, async (c) => {
-  const userId = c.get("userId");
   const paramValidation = churchIdParamSchema.safeParse({ id: c.req.param("id") });
-
   if (!paramValidation.success) {
     return c.json({ error: "Bad Request: Invalid church ID format (must be a valid UUID)" }, 400);
   }
 
-  const churchId = paramValidation.data.id;
+  const result = await joinChurch(
+    paramValidation.data.id,
+    c.get("userId"),
+    defaultDisplayName(c.get("jwtPayload"))
+  );
+  if (!result.ok) return serviceError(c, result);
 
-  // 1. Verify church existence
-  const [church] = await db
-    .select({ id: churches.id, name: churches.name })
-    .from(churches)
-    .where(eq(churches.id, churchId))
-    .limit(1);
+  const { churchName, membership, rejoined } = result.data;
+  return c.json(
+    { message: `Successfully ${rejoined ? "rejoined" : "joined"} ${churchName}`, membership },
+    rejoined ? 200 : 201
+  );
+});
 
-  if (!church) {
-    return c.json({ error: "Not Found: Church not found" }, 404);
-  }
-
-  // 2. Check for duplicate membership
-  const [existingMembership] = await db
-    .select()
-    .from(churchMembers)
-    .where(
-      and(
-        eq(churchMembers.churchId, churchId),
-        eq(churchMembers.userId, userId)
-      )
-    )
-    .limit(1);
-
-  if (existingMembership) {
-    return c.json(
-      {
-        error: "Conflict: You are already a member of this church",
-        membership: {
-          role: existingMembership.role,
-          status: existingMembership.status,
-          joinedAt: existingMembership.joinedAt,
-        },
-      },
-      409
-    );
-  }
-
-  const now = new Date();
-  const jwtPayload = c.get("jwtPayload");
-  const defaultDisplayName =
-    (jwtPayload?.name as string) ||
-    ((jwtPayload?.email as string)?.split("@")[0] ?? "User");
-
-  try {
-    // 3. Ensure profile exists for the user
-    await db
-      .insert(profiles)
-      .values({
-        userId,
-        displayName: defaultDisplayName,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .onConflictDoNothing();
-
-    // 4. Create membership strictly with role 'member'
-    const [newMembership] = await db
-      .insert(churchMembers)
-      .values({
-        churchId,
-        userId,
-        role: "member",
-        status: "active",
-        joinedAt: now,
-      })
-      .returning();
-
-    return c.json(
-      {
-        message: `Successfully joined ${church.name}`,
-        membership: newMembership,
-      },
-      201
-    );
-  } catch (err: unknown) {
-    const pgError = err as { code?: string };
-    if (pgError.code === "23505") {
-      return c.json({ error: "Conflict: You are already a member of this church" }, 409);
-    }
-    console.error("Failed to join church:", err);
-    return c.json({ error: "Internal Server Error: Could not join church" }, 500);
-  }
+/**
+ * POST /api/churches/:id/leave
+ * The caller leaves. The primary admin must transfer the role first (409).
+ */
+churchRouter.post("/:id/leave", requireAuth, requireTenantRole(ALL_MEMBER_ROLES), async (c) => {
+  const result = await leaveChurch(c.req.param("id"), c.get("userId"));
+  if (!result.ok) return serviceError(c, result);
+  return c.json({ message: "You have left this church", membership: result.data });
 });
 
 /**
  * GET /api/churches/:id/members
- * Protected endpoint returning member directory, restricted to active church members.
+ * Active member directory for members of this church. Paginated (`limit` ≤50, `offset`).
  */
-churchRouter.get(
-  "/:id/members",
+churchRouter.get("/:id/members", requireAuth, requireChurchPermission("members.view"), async (c) => {
+  const query = paginationQuerySchema.safeParse(c.req.query());
+  if (!query.success) return validationError(c, "query parameters", query.error);
+
+  const churchId = c.req.param("id");
+  const page = await listMembers(churchId, query.data);
+  return c.json({ churchId, membersCount: page.total, ...page });
+});
+
+/**
+ * PATCH /api/churches/:id/members/:membershipId/role
+ * Changes a member's role under the hierarchy rules in church-permissions.ts.
+ */
+churchRouter.patch(
+  "/:id/members/:membershipId/role",
   requireAuth,
-  requireTenantRole(["admin", "pastor", "leader", "member"]),
+  requireChurchPermission("roles.assign"),
   async (c) => {
-    const churchId = c.req.param("id");
+    const param = membershipIdParamSchema.safeParse({ membershipId: c.req.param("membershipId") });
+    if (!param.success) return validationError(c, "membership ID", param.error);
 
-    const memberList = await db
-      .select({
-        membershipId: churchMembers.id,
-        role: churchMembers.role,
-        status: churchMembers.status,
-        joinedAt: churchMembers.joinedAt,
-        user: {
-          userId: profiles.userId,
-          displayName: profiles.displayName,
-          avatarUrl: profiles.avatarUrl,
-        },
-      })
-      .from(churchMembers)
-      .innerJoin(profiles, eq(churchMembers.userId, profiles.userId))
-      .where(
-        and(
-          eq(churchMembers.churchId, churchId),
-          eq(churchMembers.status, "active")
-        )
-      );
+    const body = updateMemberRoleSchema.safeParse(await readJsonBody(c));
+    if (!body.success) return validationError(c, "role payload", body.error);
 
-    return c.json({
-      churchId,
-      membersCount: memberList.length,
-      members: memberList,
-    });
+    const result = await changeMemberRole(
+      c.req.param("id"),
+      c.get("userId"),
+      param.data.membershipId,
+      body.data.role
+    );
+    if (!result.ok) return serviceError(c, result);
+    return c.json({ membership: result.data });
+  }
+);
+
+/**
+ * DELETE /api/churches/:id/members/:membershipId
+ * Removes a member (soft: status `removed`). Admins only; never the primary admin.
+ */
+churchRouter.delete(
+  "/:id/members/:membershipId",
+  requireAuth,
+  requireChurchPermission("members.remove"),
+  async (c) => {
+    const param = membershipIdParamSchema.safeParse({ membershipId: c.req.param("membershipId") });
+    if (!param.success) return validationError(c, "membership ID", param.error);
+
+    const result = await removeMember(c.req.param("id"), c.get("userId"), param.data.membershipId);
+    if (!result.ok) return serviceError(c, result);
+    return c.json({ message: "Member removed", membership: result.data });
+  }
+);
+
+/**
+ * POST /api/churches/:id/primary-transfer
+ * The primary admin offers the role to another active member (expires in 7 days).
+ */
+churchRouter.post(
+  "/:id/primary-transfer",
+  requireAuth,
+  requireTenantRole(ALL_MEMBER_ROLES),
+  async (c) => {
+    const body = primaryTransferSchema.safeParse(await readJsonBody(c));
+    if (!body.success) return validationError(c, "transfer payload", body.error);
+
+    const result = await offerPrimaryTransfer(c.req.param("id"), c.get("userId"), body.data.membershipId);
+    if (!result.ok) return serviceError(c, result);
+    return c.json({ transfer: result.data }, 201);
+  }
+);
+
+/**
+ * POST /api/churches/:id/primary-transfer/accept
+ * The recipient accepts; flags swap atomically and the former primary admin stays an admin.
+ */
+churchRouter.post(
+  "/:id/primary-transfer/accept",
+  requireAuth,
+  requireTenantRole(ALL_MEMBER_ROLES),
+  async (c) => {
+    const result = await acceptPrimaryTransfer(c.req.param("id"), c.get("userId"));
+    if (!result.ok) return serviceError(c, result);
+    return c.json({ message: "You are now the primary admin of this church", transfer: result.data });
+  }
+);
+
+/**
+ * POST /api/churches/:id/primary-transfer/cancel
+ * The primary admin withdraws the offer, or the recipient declines it.
+ */
+churchRouter.post(
+  "/:id/primary-transfer/cancel",
+  requireAuth,
+  requireTenantRole(ALL_MEMBER_ROLES),
+  async (c) => {
+    const result = await cancelPrimaryTransfer(c.req.param("id"), c.get("userId"));
+    if (!result.ok) return serviceError(c, result);
+    return c.json({ message: "Transfer cancelled", transfer: result.data });
   }
 );

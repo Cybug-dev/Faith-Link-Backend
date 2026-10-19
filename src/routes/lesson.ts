@@ -3,7 +3,8 @@ import { eq, and, ne, asc } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { lessons, lessonCompletions } from "../db/schema.js";
 import { requireAuth } from "../middleware/auth.js";
-import { requireTenantRole, type TenantContext } from "../middleware/tenant.js";
+import { requireTenantRole, requireChurchPermission, type TenantContext } from "../middleware/tenant.js";
+import { hasPermission } from "../services/church-permissions.js";
 import {
   createLessonSchema,
   updateLessonSchema,
@@ -14,7 +15,6 @@ import { syncUserAchievements } from "../services/progress.js";
 export const lessonRouter = new Hono<TenantContext>();
 
 const ALL_MEMBER_ROLES = ["admin", "pastor", "leader", "member"];
-const LEADER_ROLES = ["admin", "pastor", "leader"];
 
 /**
  * GET /api/churches/:id/lessons
@@ -30,12 +30,12 @@ lessonRouter.get("/:id/lessons", requireAuth, requireTenantRole(ALL_MEMBER_ROLES
 
   try {
     // 1. Fetch lessons
-    const isLeader = LEADER_ROLES.includes(memberRole);
+    const canManage = hasPermission(memberRole, "lessons.manage");
     const lessonList = await db
       .select()
       .from(lessons)
       .where(
-        isLeader
+        canManage
           ? eq(lessons.churchId, churchId)
           : and(eq(lessons.churchId, churchId), eq(lessons.status, "published"))
       )
@@ -104,8 +104,8 @@ lessonRouter.get("/:id/lessons/:lessonId", requireAuth, requireTenantRole(ALL_ME
       return c.json({ error: "Not Found: Lesson not found in this church" }, 404);
     }
 
-    const isLeader = LEADER_ROLES.includes(memberRole);
-    if (!isLeader && lesson.status !== "published") {
+    const canManage = hasPermission(memberRole, "lessons.manage");
+    if (!canManage && lesson.status !== "published") {
       return c.json({ error: "Not Found: Lesson not found in this church" }, 404);
     }
 
@@ -134,9 +134,9 @@ lessonRouter.get("/:id/lessons/:lessonId", requireAuth, requireTenantRole(ALL_ME
 /**
  * POST /api/churches/:id/lessons
  * Creates a new lesson within a church.
- * Guarded by requireTenantRole(['admin', 'pastor', 'leader']).
+ * Guarded by requireChurchPermission('lessons.manage') (admin, pastor).
  */
-lessonRouter.post("/:id/lessons", requireAuth, requireTenantRole(LEADER_ROLES), async (c) => {
+lessonRouter.post("/:id/lessons", requireAuth, requireChurchPermission("lessons.manage"), async (c) => {
   const churchId = c.get("churchId");
   const userId = c.get("userId");
   const rawBody = await c.req.json().catch(() => null);
@@ -203,9 +203,9 @@ lessonRouter.post("/:id/lessons", requireAuth, requireTenantRole(LEADER_ROLES), 
 /**
  * PUT /api/churches/:id/lessons/:lessonId
  * Updates an existing lesson.
- * Guarded by requireTenantRole(['admin', 'pastor', 'leader']).
+ * Guarded by requireChurchPermission('lessons.manage') (admin, pastor).
  */
-lessonRouter.put("/:id/lessons/:lessonId", requireAuth, requireTenantRole(LEADER_ROLES), async (c) => {
+lessonRouter.put("/:id/lessons/:lessonId", requireAuth, requireChurchPermission("lessons.manage"), async (c) => {
   const churchId = c.get("churchId");
   const lessonId = c.req.param("lessonId");
   const rawBody = await c.req.json().catch(() => null);
@@ -321,8 +321,8 @@ lessonRouter.post("/:id/lessons/:lessonId/complete", requireAuth, requireTenantR
       return c.json({ error: "Not Found: Lesson not found in this church" }, 404);
     }
 
-    const isLeader = LEADER_ROLES.includes(memberRole);
-    if (!isLeader && lesson.status !== "published") {
+    const canManage = hasPermission(memberRole, "lessons.manage");
+    if (!canManage && lesson.status !== "published") {
       return c.json({ error: "Not Found: Lesson not found in this church" }, 404);
     }
 

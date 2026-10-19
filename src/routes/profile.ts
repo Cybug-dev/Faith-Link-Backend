@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { profiles, churchMembers, churches, lessonCompletions, lessons } from "../db/schema.js";
 import { requireAuth, type AuthContext } from "../middleware/auth.js";
@@ -34,6 +34,7 @@ profileRouter.get("/me", async (c) => {
     .select({
       membershipId: churchMembers.id,
       role: churchMembers.role,
+      isPrimaryAdmin: churchMembers.isPrimaryAdmin,
       status: churchMembers.status,
       joinedAt: churchMembers.joinedAt,
       church: {
@@ -41,11 +42,13 @@ profileRouter.get("/me", async (c) => {
         name: churches.name,
         slug: churches.slug,
         logoUrl: churches.logoUrl,
+        roleLabels: churches.roleLabels,
       },
     })
     .from(churchMembers)
     .innerJoin(churches, eq(churchMembers.churchId, churches.id))
-    .where(eq(churchMembers.userId, userId));
+    // Left/removed rows are history, not memberships.
+    .where(and(eq(churchMembers.userId, userId), eq(churchMembers.status, "active")));
 
   return c.json({
     user: {

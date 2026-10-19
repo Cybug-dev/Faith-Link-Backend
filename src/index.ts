@@ -18,7 +18,7 @@ app.use(
   cors({
     // Echo the origin only when allowlisted; otherwise no CORS headers, so the browser blocks it.
     origin: (origin) => (allowedOrigins.has(origin) ? origin : null),
-    allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],
     maxAge: 86400,
   })

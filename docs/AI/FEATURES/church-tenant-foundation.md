@@ -1,7 +1,7 @@
 # Feature: Church Tenant Foundation
 
 ## Status
-Completed & Verified
+Completed & Verified. Extended by `membership-hierarchy.md` (primary admin, role management, directory, leave/rejoin, transfers), which supersedes the endpoint details below where they differ.
 
 ## Goal
 Implement the foundational multi-tenant church endpoints and reusable role authorization guard for FaithLink, enabling authenticated users to create a church (with creator assigned as admin in a transaction), view church information (with public vs member visibility), and join a church safely as a standard member.

@@ -39,3 +39,23 @@
 ## ADR 008: Password reset completes through the backend
 * **Decision**: The final reset call (email + code + new password) goes through `POST /api/auth/password-reset`, which calls Neon Auth and then sends a "password changed" email via Resend. Resend is called over REST (no SDK). Neon's own sender still delivers sign-up and reset codes until a domain is verified.
 * **Reason**: Neon Auth has no webhook/event for a finished reset; the Resend sandbox sender only reaches the account owner, so it can't replace Neon's sender yet.
+
+## ADR 009: Four fixed church roles + one protected primary admin (2026-10-19, user-approved)
+* **Decision**: Roles stay `admin | pastor | leader | member`, enforced by DB CHECK. The church creator is an `admin` with `church_members.is_primary_admin = true`: exactly one per church (partial unique index), and it must be an active admin (CHECK). Nobody, including other admins, can demote, remove, or take this flag except through a two-step transfer (offer → recipient accepts). The primary admin cannot leave without transferring first.
+* **Reason**: User chose 4 roles over a separate "owner" role. A flag gives founder protection without a 5th role and guarantees every church keeps an admin. The name is "primary", not "founder", because after a transfer the holder is not the founder.
+
+## ADR 010: Church role labels are display-only
+* **Decision**: `churches.role_labels` (jsonb, e.g. `{"leader":"Deacon"}`), edited by admins via `PATCH /api/churches/:id`. Authorization always uses the system role.
+* **Reason**: User instruction: churches may rename roles, but each role's functions stay the same.
+
+## ADR 011: Named permission map as the single authorization source
+* **Decision**: `src/services/church-permissions.ts` maps actions to roles; routes use `requireChurchPermission(action)`. Lessons are managed by admin + pastor only (leaders lose lesson authoring); quizzes by admin + pastor + leader. Pastors may assign only member↔leader. `GET /api/churches/:id` returns `viewer.permissions` so the frontend renders from backend rules.
+* **Reason**: User's role split: pastors handle Bible lessons, leaders handle quizzes. One map avoids role lists drifting apart across routes.
+
+## ADR 012: Anti-spam on church creation is a per-user cap, not verification
+* **Decision**: A user may be primary admin of at most 3 churches (`MAX_PRIMARY_ADMIN_CHURCHES`). No manual review or extra verification (email is already verified, ADR 006). Slug stays unique and non-editable.
+* **Reason**: Least burdensome safeguard that stops mass creation. Review/verification can be added later if abuse appears.
+
+## ADR 013: Membership hardening ahead of Phase 7
+* **Decision**: Extend Phases 2–3 (membership/authorization) before starting Phase 7 (leaderboard). Status values `active | left | removed`: `left` users can rejoin as `member`, `removed` users cannot self-rejoin. Lost-account recovery for a primary admin is a manual support action for now.
+* **Reason**: User instruction (2026-10-19). Leaderboards and church content depend on a sound membership model.
