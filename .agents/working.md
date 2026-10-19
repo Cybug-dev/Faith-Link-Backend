@@ -1,7 +1,7 @@
 # Working Log — Faith-Link-Backend
 
 ## Current State
-✅ Membership hierarchy built + verified on temp branch. Next: user OK to apply migration to production (pending Neon migration id e8e84bb7-cb24-4665-8b59-3085010708e1, temp branch br-weathered-voice-b4n16spe) + `neon deploy`; then frontend wiring. Older pending: Vercel env vars + FE redeploy (needs user OK).
+✅ [2026-10-19] Membership hierarchy live: migration 0002 applied to production, `neon deploy` done (smoke: directory 200, leave 401 unauth, CORS allows PATCH), pushed b9681ba. FE pushed fb84b79 (Vercel deploys from main). Next: try My Church live in a browser, then Phase 7.
 
 ## Handoff
 - ✅ [2026-10-19] Verified: tsc clean; all 7 suites pass on temp branch; DB constraint + backfill checks; 13-step e2e service run (scratch script, not in repo). Fixed during verification: Drizzle wraps pg errors (`membership.ts:isUniqueViolation`), directory memberCount subquery bound to wrong `id`. Placed permissions in `src/services/church-permissions.ts` (plan said `src/auth/`). Do not re-read: church-permissions.ts, membership.ts, church.ts (verified).
